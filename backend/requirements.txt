@@ -1,0 +1,25 @@
+# Core FastAPI dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# LangGraph and LangChain dependencies
+langgraph==0.2.74
+langgraph-checkpoint-sqlite==2.0.4
+langchain==0.2.0
+langchain-core==0.2.0
+
+# Pydantic for data validation
+pydantic==2.5.0
+
+# HTTP client for external API calls
+httpx==0.25.2
+
+# Additional runtime dependencies
+python-multipart==0.0.6  # For form data handling
+typing-extensions==4.8.0  # For TypedDict support
+
+# Development dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0  # Code formatting
+isort==5.12.0   # Import sorting

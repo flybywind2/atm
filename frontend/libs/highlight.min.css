@@ -1,0 +1,41 @@
+/* Placeholder for highlight.js CSS theme */
+/* In production, download from: https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/default.min.css */
+
+/* Basic syntax highlighting styles */
+.hljs {
+    background: #f0f0f0;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-title {
+    color: #0066cc;
+    font-weight: bold;
+}
+
+.hljs-string,
+.hljs-attr {
+    color: #008800;
+}
+
+.hljs-comment {
+    color: #888888;
+    font-style: italic;
+}
+
+.hljs-number {
+    color: #cc6600;
+}
+
+.hljs-function,
+.hljs-class {
+    color: #9933cc;
+    font-weight: bold;
+}
+
+.hljs-variable {
+    color: #006699;
+}
