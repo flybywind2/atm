@@ -33,10 +33,9 @@ logging.basicConfig(level=logging.INFO)
 
 
 class LLMProvider(Enum):
-    """Supported LLM providers"""
+    """지원 LLM 공급자 (internal, ollama)"""
     INTERNAL = "internal"
     OLLAMA = "ollama"
-    OPENAI = "openai"
 
 
 class AgentType(Enum):
@@ -56,8 +55,8 @@ class LLMConfig:
     provider: LLMProvider
     base_url: str
     api_key: str = "dummy-key"
-    model: str = "gpt-3.5-turbo"
-    timeout: int = 60
+    model: str = "openai/gpt-oss:120b"
+    timeout: int = 120
     max_retries: int = 3
     retry_delay: float = 1.0
     max_tokens: Optional[int] = None
@@ -144,10 +143,16 @@ class InternalLLMClient(BaseLLMClient):
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
             # Enterprise-specific headers
-            "x-dep-ticket": self.config.custom_headers.get("x-dep-ticket", "default-ticket"),
-            "Send-System-Name": self.config.custom_headers.get("Send-System-Name", "ATM-System"),
-            "User-ID": self.config.custom_headers.get("User-ID", "system-user"),
-            "User-Type": self.config.custom_headers.get("User-Type", "AD"),
+            "x-dep-ticket": self.config.custom_headers.get(
+                "x-dep-ticket", os.getenv("INTERNAL_LLM_TICKET", "")
+            ),
+            "Send-System-Name": self.config.custom_headers.get(
+                "Send-System-Name", os.getenv("INTERNAL_LLM_SYSTEM_NAME", "ATM-System")
+            ),
+            "User-ID": self.config.custom_headers.get(
+                "User-ID", os.getenv("INTERNAL_LLM_USER_ID", os.getenv("USER_ID", "system-user"))
+            ),
+            "User-Type": self.config.custom_headers.get("User-Type", "AD_ID"),
             "Prompt-Msg-Id": str(uuid.uuid4()),
             "Completion-Msg-Id": str(uuid.uuid4()),
         }
@@ -374,28 +379,24 @@ class LLMManager:
                 service_type = None
         service_type = (service_type or "ollama").lower()
 
-        if service_type == "external":
-            provider = LLMProvider.OPENAI
-            base_url = (app_settings.EXTERNAL_LLM_API_URL if app_settings else os.getenv("EXTERNAL_LLM_API_URL", "https://api.openai.com/v1"))
-            api_key = (app_settings.EXTERNAL_LLM_API_KEY if app_settings else os.getenv("EXTERNAL_LLM_API_KEY", ""))
-            model = (app_settings.EXTERNAL_LLM_MODEL if app_settings else os.getenv("EXTERNAL_LLM_MODEL", "gpt-4o-mini"))
-            custom_headers = {"Authorization": f"Bearer {api_key}"}
-        elif service_type == "internal":
+        if service_type == "internal":
             provider = LLMProvider.INTERNAL
             base_url = (app_settings.INTERNAL_LLM_API_URL if app_settings else os.getenv("INTERNAL_LLM_API_URL", "http://localhost:11434/v1"))
             api_key = (app_settings.INTERNAL_LLM_API_KEY if app_settings else os.getenv("INTERNAL_LLM_API_KEY", ""))
             model = (app_settings.INTERNAL_LLM_MODEL if app_settings else os.getenv("INTERNAL_LLM_MODEL", "gpt-4"))
             custom_headers = {
-                "x-dep-ticket": os.getenv("INTERNAL_LLM_TICKET", "default-ticket"),
-                "Send-System-Name": "ATM-System",
-                "User-ID": os.getenv("USER_ID", "system"),
-                "User-Type": "AD"
+                "x-dep-ticket": os.getenv("INTERNAL_LLM_TICKET", ""),
+                "Send-System-Name": os.getenv("INTERNAL_LLM_SYSTEM_NAME", "ATM-System"),
+                "User-ID": os.getenv("INTERNAL_LLM_USER_ID", os.getenv("USER_ID", "system-user")),
+                "User-Type": os.getenv("INTERNAL_LLM_USER_TYPE", "AD_ID"),
+                "Prompt-Msg-Id": str(uuid.uuid4()),
+                "Completion-Msg-Id": str(uuid.uuid4()),
             }
         else:
             provider = LLMProvider.OLLAMA
             base_url = (app_settings.OLLAMA_BASE_URL if app_settings else os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
             api_key = "dummy-key"
-            model = (app_settings.OLLAMA_MODEL if app_settings else os.getenv("OLLAMA_MODEL", "llama3.1"))
+            model = (app_settings.OLLAMA_MODEL if app_settings else os.getenv("OLLAMA_MODEL", "gemma3:1b"))
             custom_headers = {}
 
         return LLMConfig(
@@ -413,16 +414,10 @@ class LLMManager:
         """Initialize primary and fallback clients"""
         # Primary client
         if self.config.provider == LLMProvider.INTERNAL:
+            # internal: 이 모듈의 InternalLLMClient만 사용
             self.client = InternalLLMClient(self.config)
         elif self.config.provider == LLMProvider.OLLAMA:
             self.client = OllamaLLMClient(self.config)
-        elif self.config.provider == LLMProvider.OPENAI:
-            # 외부 LLM: 루트 appendix/internal_llm.py의 llm 어댑터를 사용 시도
-            try:
-                self.client = ExternalAdapterClient(self.config)
-            except Exception as e:
-                logger.warning(f"External adapter load failed: {e}; falling back to InternalLLMClient against external API")
-                self.client = InternalLLMClient(self.config)
         
         # Setup fallback clients
         self._setup_fallback_clients()
@@ -430,11 +425,11 @@ class LLMManager:
     def _setup_fallback_clients(self):
         """Setup fallback clients for resilience"""
         if self.config.provider == LLMProvider.INTERNAL:
-            # Fallback to Ollama for internal
+            # internal 실패 시 ollama 폴백
             ollama_config = LLMConfig(
                 provider=LLMProvider.OLLAMA,
-                base_url="http://localhost:11434",
-                model="llama3.1"
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                model=os.getenv("OLLAMA_MODEL", "llama3.1")
             )
             self.fallback_clients.append(OllamaLLMClient(ollama_config))
 
@@ -491,64 +486,6 @@ class LLMManager:
         for fallback_client in self.fallback_clients:
             await fallback_client.close()
 
-class ExternalAdapterClient(BaseLLMClient):
-    """외부 LLM 어댑터 클라이언트
-
-    - 루트 모듈 `appendix.internal_llm`의 `llm` 객체(ChatOpenAI 등)를 재사용합니다.
-    - 모듈 임포트 시 콘솔 출력이 발생할 수 있어, 임포트 시 표준출력을 일시적으로 차단합니다.
-    """
-
-    def __init__(self, config: LLMConfig):
-        super().__init__(config)
-        self.adapter = None
-        self._import_adapter()
-
-    def _import_adapter(self):
-        import importlib
-        import sys
-        from contextlib import redirect_stdout
-        from io import StringIO
-        from pathlib import Path
-
-        # repo 루트를 sys.path에 추가하여 'appendix' 패키지 임포트 보장
-        try:
-            repo_root = Path(__file__).resolve().parents[3]
-            if str(repo_root) not in sys.path:
-                sys.path.insert(0, str(repo_root))
-        except Exception:
-            pass
-
-        buf = StringIO()
-        with redirect_stdout(buf):
-            module = importlib.import_module("appendix.internal_llm")
-        adapter = getattr(module, "llm", None)
-        if adapter is None:
-            raise ImportError("appendix.internal_llm 모듈에 'llm' 인스턴스가 없습니다.")
-        self.adapter = adapter
-
-    @retry_on_failure()
-    async def chat_completion(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
-        # messages를 단일 프롬프트로 단순 결합
-        prompt = "\n\n".join(f"[{m['role']}] {m['content']}" for m in messages)
-        try:
-            import asyncio
-            loop = asyncio.get_event_loop()
-            # 어댑터는 동기일 수 있으므로 스레드 풀에서 실행 + 타임아웃 적용
-            timeout = kwargs.get("timeout") or self.config.timeout or 60
-            result = await asyncio.wait_for(
-                loop.run_in_executor(None, lambda: self.adapter.invoke(prompt)),
-                timeout=timeout
-            )
-            content = getattr(result, "content", None) or str(result)
-            return LLMResponse(content=content, model=self.config.model)
-        except Exception as e:
-            raise Exception(f"External adapter 호출 실패: {e}")
-
-    async def stream_completion(self, messages: List[Dict[str, str]], **kwargs):
-        # 간단 구현: 스트리밍 미지원 → 전체 반환
-        resp = await self.chat_completion(messages, **kwargs)
-        yield resp.content
-
 
 
 class AgentPromptTemplates:
@@ -575,8 +512,6 @@ You excel at breaking down complex business problems into structured, actionable
 - **AUTOMATION**: 단순 반복 작업 자동화 (예: 파일 처리, 스케줄링, API 호출)
 - **INFORMATION_RETRIEVAL**: 정보 검색, 문서 조회 시스템
 - **DATA_VISUALIZATION**: 차트, 대시보드, 리포트 생성
-
-**특히 폐수처리, 수질관리, 환경 모니터링 등의 문제는 대부분 ML_CLASSIFICATION 또는 ML_REGRESSION 문제입니다.**
 
 Analyze problems systematically:
 1. Identify core issues and pain points
@@ -822,12 +757,8 @@ class LLMAgentService:
             "보고서", "자동화된 보고", "automated reporting"
         ]
 
-        # ML keywords for environmental/industrial problems (but excluding common integration terms)
+        # ML keywords (but excluding common integration terms)
         specific_ml_keywords = [
-            # Environmental/Industrial specific
-            "폐수", "수질", "오염", "환경", "농도", "수치", "측정", "품질",
-            "wastewater", "water", "quality", "pollution", "environmental", "concentration",
-            "measurement", "anomaly detection", "outlier", "treatment", "처리",
             # ML specific terms
             "예측", "분류", "모델", "머신러닝", "기계학습", "알고리즘", "신경망", "회귀", "이상치", "원인", "파악",
             "predict", "classify", "model", "ml", "machine learning", "neural", "algorithm", "regression"
@@ -909,10 +840,6 @@ class LLMAgentService:
 
         # Specific ML keywords (excluding generic terms)
         specific_ml_keywords = [
-            # Environmental/Industrial specific
-            "폐수", "수질", "오염", "환경", "농도", "수치", "측정", "품질",
-            "wastewater", "water", "quality", "pollution", "environmental", "concentration",
-            "measurement", "anomaly detection", "outlier", "treatment", "처리",
             # ML specific terms
             "예측", "분류", "모델", "머신러닝", "기계학습", "알고리즘", "신경망", "회귀", "이상치", "원인", "파악",
             "predict", "classify", "model", "ml", "machine learning", "neural", "algorithm", "regression"

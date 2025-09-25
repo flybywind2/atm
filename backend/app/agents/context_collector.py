@@ -58,6 +58,27 @@ def pick_diverse_question(candidates: list, asked: list, threshold: float = 0.5)
 logger = logging.getLogger(__name__)
 
 
+def _extract_json_from_text(text: str):
+    """LLM 응답에서 JSON 본문만 안전하게 추출하여 파싱합니다.
+
+    - ```json/``` 코드펜스를 제거합니다.
+    - 첫 { 와 마지막 } 사이를 잘라 파싱을 시도합니다.
+    실패 시 원문으로 json.loads를 시도합니다.
+    """
+    s = (text or "").strip()
+    if s.startswith('```json'):
+        s = s[7:]
+    elif s.startswith('```'):
+        s = s[3:]
+    if s.endswith('```'):
+        s = s[:-3]
+    s = s.strip()
+    start = s.find('{')
+    end = s.rfind('}')
+    if start != -1 and end != -1 and end > start:
+        return json.loads(s[start:end+1])
+    return json.loads(s)
+
 async def collect_context(state: WorkflowState) -> WorkflowState:
     """
     Human-in-the-Loop(사람 개입) 방식으로 추가 컨텍스트를 수집합니다.
@@ -396,8 +417,8 @@ async def process_user_response(
             temperature=0.3
         )
         
-        # Parse JSON response
-        processed_data = json.loads(llm_response)
+        # Parse JSON response (robust extraction)
+        processed_data = _extract_json_from_text(llm_response)
         
         # Merge with existing context data
         updated_context = context_data.copy()
@@ -507,7 +528,12 @@ async def update_missing_information(
             assessment_prompt,
             temperature=0.3
         )
-        missing_info = json.loads(llm_response)
+        try:
+            missing_info = json.loads(llm_response)
+        except Exception:
+            # 코드펜스/부가 텍스트 제거 후 재시도
+            parsed = _extract_json_from_text(llm_response)
+            missing_info = parsed
         
         if isinstance(missing_info, list):
             return missing_info[:3]  # Limit to 3 items
