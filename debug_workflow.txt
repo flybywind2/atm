@@ -1212,3 +1212,54 @@ State keys: ['problem_description', 'conversation_history', 'context_data', 'req
 
 === GUIDE_CREATOR CALLED at 2025-09-25 15:53:09.908439 ===
 State keys: ['problem_description', 'conversation_history', 'context_data', 'requirements_doc', 'solution_type', 'requirements_document', 'tech_recommendations', 'tech_stack', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'user_journey_map', 'requirements_definition', 'recommended_solution_type', 'technology_stack', 'implementation_plan', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== RUN_LANGGRAPH_WORKFLOW CALLED at 2025-09-25 06:56:46.594642 ===
+Thread ID: 20684142-096a-4017-9550-847017d06ce7
+Initial state keys: ['problem_description', 'user_context', 'current_step', 'conversation_history', 'requires_user_input', 'context_complete', 'retry_count']
+Compiled workflow ready, starting astream execution
+Thread config: {'configurable': {'thread_id': '20684142-096a-4017-9550-847017d06ce7'}, 'recursion_limit': 50}
+
+=== ANALYZER CALLED at 2025-09-25 15:56:48.607602 ===
+State keys: ['problem_description', 'conversation_history', 'current_step', 'context_complete', 'requires_user_input', 'retry_count']
+
+=== CONTEXT_COLLECTOR CALLED at 2025-09-25 15:56:52.089904 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'retry_count']
+
+=== RUN_LANGGRAPH_WORKFLOW CALLED at 2025-09-25 06:57:21.018984 ===
+Thread ID: 856bfe55-48da-4313-83a9-44fde113c05a
+Initial state keys: ['problem_description', 'user_context', 'current_step', 'conversation_history', 'requires_user_input', 'context_complete', 'retry_count']
+Compiled workflow ready, starting astream execution
+Thread config: {'configurable': {'thread_id': '856bfe55-48da-4313-83a9-44fde113c05a'}, 'recursion_limit': 50}
+
+=== ANALYZER CALLED at 2025-09-25 15:57:23.019474 ===
+State keys: ['problem_description', 'conversation_history', 'current_step', 'context_complete', 'requires_user_input', 'retry_count']
+
+=== CONTEXT_COLLECTOR CALLED at 2025-09-25 15:57:26.487076 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'retry_count']
+
+=== ANALYZER CALLED at 2025-09-25 15:57:40.847303 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== CONTEXT_COLLECTOR CALLED at 2025-09-25 15:57:42.256736 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== ANALYZER CALLED at 2025-09-25 15:58:04.406942 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== CONTEXT_COLLECTOR CALLED at 2025-09-25 15:58:06.016916 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== ANALYZER CALLED at 2025-09-25 15:58:27.806941 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== CONTEXT_COLLECTOR CALLED at 2025-09-25 15:58:29.265460 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== REQUIREMENTS_GENERATOR CALLED at 2025-09-25 15:58:32.838737 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== SOLUTION_DESIGNER CALLED at 2025-09-25 15:58:48.533576 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'requirements_doc', 'requirements_document', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'user_journey_map', 'requirements_definition', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']
+
+=== GUIDE_CREATOR CALLED at 2025-09-25 15:58:55.351540 ===
+State keys: ['problem_description', 'conversation_history', 'context_data', 'requirements_doc', 'solution_type', 'requirements_document', 'tech_recommendations', 'tech_stack', 'current_step', 'pending_questions', 'user_responses', 'problem_analysis', 'missing_information', 'user_journey_map', 'requirements_definition', 'recommended_solution_type', 'technology_stack', 'implementation_plan', 'current_status', 'context_complete', 'requires_user_input', 'user_input', 'retry_count']

@@ -74,11 +74,11 @@ class ProblemSolvingApp {
         // Handle page visibility changes for polling optimization
         document.addEventListener('visibilitychange', () => {
             if (document.hidden && this.pollingInterval) {
-                // Reduce polling frequency when tab is hidden
-                this.adjustPollingFrequency(5000);
+                // 탭이 숨겨진 경우 폴링 주기를 10초로 완화
+                this.adjustPollingFrequency(10000);
             } else if (!document.hidden && this.pollingInterval) {
-                // Restore normal polling frequency when tab is visible
-                this.adjustPollingFrequency(2000);
+                // 탭이 보이는 경우 기본 폴링 주기를 5초로 설정
+                this.adjustPollingFrequency(5000);
             }
         });
     }
@@ -139,7 +139,7 @@ class ProblemSolvingApp {
 
         this.pollingInterval = setInterval(async () => {
             await this.pollStatus();
-        }, 500); // Poll every 500ms for maximum responsiveness
+        }, 5000); // Poll every 5s to reduce load
     }
     
     /**
