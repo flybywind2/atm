@@ -138,6 +138,8 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
             # Store detailed design components
             **solution_design
         })
+        # Preserve nested design for downstream guide generation
+        updated_state["solution_design"] = solution_design
         
         logger.info(f"Solution design completed. Type: {solution_design.get('solution_type')}")
         
@@ -627,64 +629,71 @@ async def generate_technology_recommendations(
     try:
         tech_prompt = f"""
         You are an expert technology consultant. Recommend a comprehensive technology stack 
-        for the following solution.
+        for the following solution. Write all string values in Korean (ko-KR). Return ONLY JSON.
         
         Solution Type: {solution_type}
         Problem Category: {problem_analysis.get('category', 'GENERAL')}
         Complexity: {problem_analysis.get('complexity', 'MEDIUM')}
         
         Context Requirements:
-        {json.dumps(context_data, indent=2)}
+        {json.dumps(context_data, indent=2, ensure_ascii=False)}
         
         Provide technology recommendations in the following JSON format:
         {{
             "primary_technologies": [
                 {{
-                    "name": "Technology name",
-                    "version": "Recommended version", 
-                    "purpose": "What it's used for",
+                    "name": "기술명",
+                    "version": "권장 버전", 
+                    "purpose": "용도(무엇에 사용하는지)",
                     "priority": "CRITICAL/HIGH/MEDIUM/LOW",
-                    "installation": "pip install command",
-                    "documentation": "Documentation URL"
+                    "installation": "pip install 명령",
+                    "documentation": "문서 URL"
                 }}
             ],
             "alternative_technologies": [
                 {{
-                    "name": "Alternative name",
-                    "use_case": "When to use this instead",
-                    "pros": ["Advantages"],
-                    "cons": ["Disadvantages"]
+                    "name": "대안 기술명",
+                    "use_case": "이 대안을 사용할 상황",
+                    "pros": ["장점"],
+                    "cons": ["단점"]
                 }}
             ],
             "development_tools": [
                 {{
-                    "tool": "Tool name",
-                    "purpose": "Development purpose",
-                    "installation": "How to install"
+                    "tool": "도구명",
+                    "purpose": "개발 목적",
+                    "installation": "설치 방법"
                 }}
             ],
             "deployment_technologies": [
                 {{
-                    "technology": "Deployment technology",
-                    "scenario": "When to use",
-                    "complexity": "Setup complexity"
+                    "technology": "배포 기술",
+                    "scenario": "사용 시나리오",
+                    "complexity": "설정 난이도"
                 }}
             ],
             "architecture_decisions": [
                 {{
-                    "decision": "Technical decision",
-                    "rationale": "Why this choice",
-                    "alternatives": ["Other options considered"]
+                    "decision": "기술적 의사결정",
+                    "rationale": "선정 근거",
+                    "alternatives": ["고려한 대안"]
+                }}
+            ],
+            "recommended_stack": [
+                {{
+                    "layer": "계층/구성요소",
+                    "technology": "추천 기술",
+                    "reason": "선정 이유"
                 }}
             ]
         }}
         
         Focus on:
-        1. Python ecosystem libraries and frameworks
-        2. Appropriate complexity level for the solution
-        3. Maintainability by Python beginners
-        4. Industry best practices
-        5. Cost-effective solutions
+        1. Python 생태계 라이브러리/프레임워크
+        2. 솔루션 복잡도에 적합한 선택
+        3. 초급 개발자도 유지보수 가능한 구성
+        4. 업계 모범 사례
+        5. 비용 효율성
         """
         
         # Get the LLM agent service
@@ -706,7 +715,15 @@ async def generate_technology_recommendations(
                 "raw_response": llm_response
             }
         
-        return validate_tech_recommendations(tech_recommendations, solution_type)
+        # Normalize and validate
+        validated = validate_tech_recommendations(tech_recommendations, solution_type)
+        
+        # If still empty or unhelpful, fall back to a solid default set
+        if not isinstance(validated.get("primary_technologies"), list) or len(validated["primary_technologies"]) == 0:
+            fallback = create_fallback_tech_recommendations(solution_type, problem_analysis)
+            validated = validate_tech_recommendations(fallback, solution_type)
+        
+        return validated
         
     except (json.JSONDecodeError, Exception) as e:
         logger.warning(f"LLM tech recommendations failed, using fallback: {str(e)}")
@@ -730,7 +747,8 @@ def validate_tech_recommendations(recommendations: Dict[str, Any], solution_type
         "alternative_technologies": recommendations.get("alternative_technologies", []),
         "development_tools": recommendations.get("development_tools", []),
         "deployment_technologies": recommendations.get("deployment_technologies", []),
-        "architecture_decisions": recommendations.get("architecture_decisions", [])
+        "architecture_decisions": recommendations.get("architecture_decisions", []),
+        "recommended_stack": recommendations.get("recommended_stack", [])
     }
     
     # Validate primary technologies structure
@@ -739,6 +757,24 @@ def validate_tech_recommendations(recommendations: Dict[str, Any], solution_type
             tech.setdefault("priority", "MEDIUM")
             tech.setdefault("installation", f"pip install {tech.get('name', 'package')}")
     
+    # Create a recommended_stack if missing, derived from primary_technologies
+    if not validated.get("recommended_stack") and isinstance(validated["primary_technologies"], list):
+        stack = []
+        for tech in validated["primary_technologies"]:
+            if isinstance(tech, dict):
+                stack.append({
+                    "layer": tech.get("purpose", "구성 요소"),
+                    "technology": tech.get("name", "기술"),
+                    "reason": tech.get("rationale") or tech.get("purpose") or "핵심 기능 지원"
+                })
+            elif isinstance(tech, str):
+                stack.append({
+                    "layer": "구성 요소",
+                    "technology": tech,
+                    "reason": "핵심 기능 지원"
+                })
+        validated["recommended_stack"] = stack
+
     return validated
 
 

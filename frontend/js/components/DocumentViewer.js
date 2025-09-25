@@ -72,6 +72,9 @@ class DocumentViewerComponent {
                     </div>
                     
                     <div class="document-actions">
+                        <button type="button" class="btn btn-outline" id="back-to-progress-btn">
+                            ↩️ 진행 화면으로 돌아가기
+                        </button>
                         <button type="button" class="btn btn-primary" id="download-btn">
                             📥 다운로드
                         </button>
@@ -109,6 +112,7 @@ class DocumentViewerComponent {
         const printBtn = this.container.querySelector('#print-btn');
         const downloadAllBtn = this.container.querySelector('#download-all-btn');
         const newAnalysisBtn = this.container.querySelector('#new-analysis-btn');
+        const backBtn = this.container.querySelector('#back-to-progress-btn');
         
         // Tab switching
         tabButtons.forEach(button => {
@@ -128,6 +132,9 @@ class DocumentViewerComponent {
         printBtn.addEventListener('click', () => this.printCurrentDocument());
         downloadAllBtn.addEventListener('click', () => this.downloadAllDocuments());
         newAnalysisBtn.addEventListener('click', () => this.startNewAnalysis());
+        if (backBtn) {
+            backBtn.addEventListener('click', () => this.backToProgress());
+        }
     }
 
     /**
@@ -151,6 +158,36 @@ class DocumentViewerComponent {
             if (title) title.textContent = '분석 진행 중...';
             if (desc) desc.textContent = '문서가 순차적으로 생성됩니다. 준비되는 대로 표시합니다.';
         }
+    }
+
+    /**
+     * Update header with specific stage messages
+     */
+    setHeaderByStatus(status = '') {
+        const s = String(status || '').toLowerCase();
+        if (s === 'completed') {
+            this.setHeaderState(true);
+            return;
+        }
+        // Map status to Korean messages
+        const stageMap = {
+            'analyzing': '문제 분석 중...',
+            'collecting_context': '컨텍스트 수집 중...',
+            'awaiting_input': '사용자 입력 대기 중...',
+            'generating_requirements': '요구사항 생성 중...',
+            'designing_solution': '솔루션 설계 중...',
+            'creating_guide': '가이드 생성 중...'
+        };
+        const msg = stageMap[s] || '분석 진행 중...';
+        const box = this.container.querySelector('.completion-status');
+        if (!box) return;
+        box.setAttribute('data-state', 'processing');
+        const title = box.querySelector('h3');
+        const desc = box.querySelector('p');
+        const icon = box.querySelector('.status-icon');
+        if (icon) icon.textContent = '⏳';
+        if (title) title.textContent = msg;
+        if (desc) desc.textContent = '문서가 순차적으로 생성됩니다. 준비되는 대로 표시합니다.';
     }
     
     /**
@@ -185,8 +222,10 @@ class DocumentViewerComponent {
         // Merge partial results with existing documents
         this.documents = { ...this.documents, ...partialResults };
 
-        // Update header state to reflect progress
-        this.setHeaderState(!!isComplete);
+        // Only update header when completed; otherwise keep any stage-specific header
+        if (isComplete && typeof this.setHeaderState === 'function') {
+            this.setHeaderState(true);
+        }
 
         // Update solution info if available
         if (partialResults.solution_type) {
@@ -302,7 +341,14 @@ class DocumentViewerComponent {
             
             if (this.solutionInfo.techStack && this.solutionInfo.techStack.length > 0) {
                 techStackElement.innerHTML = this.solutionInfo.techStack
-                    .map(tech => `<span class="tech-tag">${tech}</span>`)
+                    .map(tech => {
+                        if (typeof tech === 'string') return `<span class="tech-tag">${tech}</span>`;
+                        if (tech && typeof tech === 'object') {
+                            const label = tech.technology || tech.name || tech.layer || '기술';
+                            return `<span class="tech-tag">${label}</span>`;
+                        }
+                        return '';
+                    })
                     .join('');
             } else {
                 techStackElement.textContent = '정보 없음';
@@ -665,6 +711,16 @@ class DocumentViewerComponent {
                 window.ProblemSolvingApp.reset();
             }
         }
+    }
+
+    /**
+     * Return to the progress tracker view
+     */
+    backToProgress() {
+        const app = window.ProblemSolvingApp;
+        if (!app) return;
+        app.showComponent('progress-tracker');
+        try { history.pushState({ step: 'progress-tracker' }, '', '#progress'); } catch (e) {}
     }
     
     /**

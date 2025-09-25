@@ -174,9 +174,11 @@ async def create_comprehensive_guide(
         agent_service = await get_agent_service()
         
         # Use the specialized implementation guide creation method
+        # Correct argument order: (problem_analysis, requirements_text, solution_design)
         implementation_guide = await agent_service.create_implementation_guide(
-            solution_design,
-            requirements_doc
+            problem_analysis,
+            requirements_doc,
+            solution_design
         )
         
         return implementation_guide

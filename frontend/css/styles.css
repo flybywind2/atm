@@ -56,6 +56,27 @@ body {
     padding: 2rem;
 }
 
+/* Korean typography improvements */
+.context-collector .collection-header h2,
+.context-collector .collection-header p,
+.context-collector .agent-question h3 {
+    word-break: keep-all; /* avoid breaking within Korean words */
+    white-space: normal;  /* ensure regular spacing is respected */
+}
+
+.context-collector .question-content p {
+    margin-bottom: 0.5rem;
+    word-break: keep-all;
+}
+
+.context-collector .question-content ul {
+    margin: 0.25rem 0 0.5rem 1.25rem;
+}
+
+.context-collector .question-content li {
+    line-height: 1.6;
+}
+
 /* Show problem input by default */
 #problem-input-container {
     display: block;
@@ -958,6 +979,16 @@ textarea.form-control {
     color: var(--text-secondary);
     margin: 0;
 }
+
+/* Processing style for results header */
+.completion-status[data-state="processing"] {
+    background-color: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+.completion-status[data-state="processing"] h3 {
+    color: var(--warning-color);
+}
+/* No spinning animation for processing header to match step UI */
 
 .solution-summary {
     background-color: var(--background-color);

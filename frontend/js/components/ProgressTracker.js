@@ -78,6 +78,7 @@ class ProgressTrackerComponent {
                 </div>
                 
                 <div class="progress-actions">
+                    <button id="preview-btn" class="btn btn-outline" disabled>결과 미리보기</button>
                     <button id="refresh-btn" class="btn btn-secondary">상태 새로고침</button>
                     <button id="cancel-btn" class="btn btn-danger">작업 취소</button>
                 </div>
@@ -91,9 +92,13 @@ class ProgressTrackerComponent {
     bindEvents() {
         const refreshBtn = this.container.querySelector('#refresh-btn');
         const cancelBtn = this.container.querySelector('#cancel-btn');
+        const previewBtn = this.container.querySelector('#preview-btn');
         
         refreshBtn.addEventListener('click', () => this.requestStatusUpdate());
         cancelBtn.addEventListener('click', () => this.cancelWorkflow());
+        if (previewBtn) {
+            previewBtn.addEventListener('click', () => this.previewResults());
+        }
     }
     
     /**
@@ -132,6 +137,14 @@ class ProgressTrackerComponent {
         
         // Update timestamp
         this.updateLastUpdated();
+
+        // Update preview button availability
+        const previewBtn = this.container.querySelector('#preview-btn');
+        if (previewBtn) {
+            const hasResults = status.results && Object.keys(status.results || {}).length > 0;
+            const isCompleted = String(status.status || '').toLowerCase() === 'completed';
+            previewBtn.disabled = !hasResults && !isCompleted;
+        }
     }
     
     /**
@@ -355,6 +368,39 @@ class ProgressTrackerComponent {
     cancelWorkflow() {
         if (confirm('정말로 작업을 취소하시겠습니까?')) {
             console.log('Workflow cancellation requested');
+        }
+    }
+
+    /**
+     * Preview results using the Document Viewer
+     */
+    previewResults() {
+        try {
+            const app = window.ProblemSolvingApp;
+            if (!app) return;
+
+            const status = this.currentStatus || {};
+            const docViewer = app.components && app.components.documentViewer;
+
+            if (docViewer) {
+                // Reflect current stage in header
+                if (typeof docViewer.setHeaderByStatus === 'function') {
+                    docViewer.setHeaderByStatus(status.status);
+                } else if (typeof docViewer.setHeaderState === 'function') {
+                    docViewer.setHeaderState(String(status.status || '').toLowerCase() === 'completed');
+                }
+
+                // Update with latest partial results if available
+                if (status.results && Object.keys(status.results || {}).length > 0 && typeof docViewer.updatePartialResults === 'function') {
+                    docViewer.updatePartialResults(status.results, String(status.status || '').toLowerCase() === 'completed');
+                }
+            }
+
+            // Show DocumentViewer
+            app.showComponent('document-viewer');
+            try { history.pushState({ step: 'document-viewer' }, '', '#preview'); } catch (e) {}
+        } catch (e) {
+            console.warn('미리보기 전환 중 오류:', e);
         }
     }
     

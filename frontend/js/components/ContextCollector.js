@@ -26,39 +26,33 @@ class ContextCollector {
         this.container.innerHTML = `
             <div class="context-collector">
                 <div class="collection-header">
-                    <h2>Additional Information Required</h2>
-                    <p>The AI agent needs clarification to provide better analysis</p>
+                    <h2>추가&nbsp;정보가&nbsp;필요합니다</h2>
+                    <p>더&nbsp;나은&nbsp;분석을&nbsp;위해&nbsp;몇&nbsp;가지&nbsp;질문을&nbsp;드립니다.</p>
                     <div class="progress-indicator">
-                        <span id="question-progress">Question 1 of 1</span>
+                        <span id="question-progress">질문 1 / 1</span>
                     </div>
                 </div>
                 
                 <div class="agent-question" id="agent-question">
-                    <h3>Agent Question</h3>
+                    <h3>질문</h3>
                     <div id="question-content" class="question-content">
-                        Please wait while the agent formulates questions...
+                        질문을 준비하고 있습니다. 잠시만 기다려 주세요...
                     </div>
                 </div>
                 
                 <form id="context-form" class="context-form">
                     <div class="form-group">
-                        <label for="user-response">
-                            Your Response *
-                        </label>
+                        <label for="user-response">내 답변 *</label>
                         <textarea 
                             id="user-response" 
                             class="form-control" 
                             rows="4"
-                            placeholder="Please provide detailed information to help the AI understand your requirements better..."
+                            placeholder="구체적인 수치/주기/예시 등을 포함하여 자세히 작성해 주세요."
                             required
                             maxlength="2000"
                         ></textarea>
-                        <div class="form-help">
-                            💡 <strong>Tips:</strong> Be specific and include examples where possible. If you're unsure, explain what you do know.
-                        </div>
-                        <div class="character-count">
-                            <span id="response-char-count">0</span> / 2000 characters
-                        </div>
+                        <div class="form-help">💡 <strong>팁:</strong> 가능한 한 구체적으로 작성하고, 모르는 항목은 현재 알고 있는 범위를 설명해 주세요.</div>
+                        <div class="character-count"><span id="response-char-count">0</span> / 2000자</div>
                     </div>
                     
                     <div class="response-options" id="response-options" style="display: none;">
@@ -67,28 +61,28 @@ class ContextCollector {
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary" id="submit-context-btn">
-                            <span class="btn-text">Submit Response</span>
-                            <span class="btn-loading hidden">Processing...</span>
+                            <span class="btn-text">답변 제출</span>
+                            <span class="btn-loading hidden">처리 중...</span>
                         </button>
                         
                         <button type="button" class="btn btn-secondary" id="skip-btn">
-                            Skip Question
+                            건너뛰기
                         </button>
                         
                         <button type="button" class="btn btn-outline" id="back-btn" style="display: none;">
-                            Previous Question
+                            이전 질문
                         </button>
                     </div>
                 </form>
                 
                 <div class="context-help">
-                    <h4>🔍 How to Provide Good Responses</h4>
+                    <h4>📝 좋은 답변을 작성하는 방법</h4>
                     <ul>
-                        <li><strong>Be specific:</strong> Include numbers, timeframes, and concrete examples</li>
-                        <li><strong>Explain current state:</strong> Describe what you currently do or have</li>
-                        <li><strong>Clarify goals:</strong> What outcome are you trying to achieve?</li>
-                        <li><strong>Mention constraints:</strong> Budget, time, technical limitations</li>
-                        <li><strong>If unsure:</strong> It's okay to say "I don't know" or "I need help deciding"</li>
+                        <li><strong>구체적으로:</strong> 수치/기간/예시를 포함해 주세요.</li>
+                        <li><strong>현재 상태 설명:</strong> 현재의 업무 흐름/도구를 알려주세요.</li>
+                        <li><strong>목표 명확화:</strong> 달성하고 싶은 결과를 적어주세요.</li>
+                        <li><strong>제약사항:</strong> 예산/시간/기술적 한계를 알려주세요.</li>
+                        <li><strong>모르는 경우:</strong> 모르는 부분은 모른다고 적어주셔도 됩니다.</li>
                     </ul>
                 </div>
                 
@@ -163,14 +157,14 @@ class ContextCollector {
         
         // Update question content
         if (typeof question === 'string') {
-            questionContent.textContent = question;
+            questionContent.innerHTML = this.formatPlainQuestion(question);
         } else {
             questionContent.innerHTML = this.formatQuestion(question);
             this.setupQuestionOptions(question);
         }
         
-        // Update progress
-        progressIndicator.textContent = `Question ${this.currentQuestionIndex + 1} of ${this.questions.length}`;
+        // Update progress (Korean)
+        progressIndicator.textContent = `질문 ${this.currentQuestionIndex + 1} / ${this.questions.length}`;
         
         // Show/hide back button
         backBtn.style.display = this.currentQuestionIndex > 0 ? 'inline-flex' : 'none';
@@ -192,26 +186,81 @@ class ContextCollector {
             textarea.focus();
         }, 100);
     }
-    
+
     /**
      * Format question object into HTML
      */
     formatQuestion(question) {
-        let html = `<p>${question.text || question.question || question}</p>`;
+        let title = question.text || question.question || question;
+        title = this.normalizeKoreanHints(String(title));
+        let html = `<p>${title}</p>`;
         
         if (question.context) {
-            html += `<div class="question-context"><strong>Context:</strong> ${question.context}</div>`;
+            html += `<div class="question-context"><strong>컨텍스트:</strong> ${question.context}</div>`;
         }
         
         if (question.examples) {
-            html += '<div class="question-examples"><strong>Examples:</strong><ul>';
+            html += '<div class="question-examples"><strong>예시:</strong><ul>';
             question.examples.forEach(example => {
-                html += `<li>${example}</li>`;
+                const ex = this.normalizeKoreanHints(String(example));
+                html += `<li>${ex}</li>`;
             });
             html += '</ul></div>';
         }
         
         return html;
+    }
+
+    /**
+     * Format plain string question: first line as text, following lines starting with '-' as list
+     */
+    formatPlainQuestion(text) {
+        if (!text) return '';
+        const lines = String(text).split(/\r?\n/).map(l => l.trim());
+        const escape = (s) => String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+        let html = '';
+        if (lines.length > 0) {
+            html += `<p>${escape(this.normalizeKoreanHints(lines[0]))}</p>`;
+        }
+        const rest = lines.slice(1).filter(l => l.length > 0);
+        if (rest.length > 0) {
+            html += '<ul>';
+            rest.forEach(l => {
+                const raw = l.replace(/^[\s]*[−–—\-•]\s*/, '');
+                const item = this.normalizeKoreanHints(raw);
+                html += `<li>${escape(item)}</li>`;
+            });
+            html += '</ul>';
+        }
+        return html || escape(text);
+    }
+
+    /**
+     * Normalize common Korean hint lines without spaces into readable phrases
+     */
+    normalizeKoreanHints(s) {
+        const map = {
+            '오류가발생했습니다. 아래항목을포함하여요구사항을구체적으로작성해주세요': '오류가 발생했습니다. 아래 항목을 포함하여 요구사항을 구체적으로 작성해 주세요.',
+            '현재환경서버/OS/네트워크': '현재 환경(서버/OS/네트워크)',
+            '데이터출처형식규모': '데이터(출처/형식/규모)',
+            '목표원하는결과': '목표(원하는 결과)',
+            '제약시간예산보안등)': '제약(시간/예산/보안 등)'
+        };
+        const trimmed = String(s).trim();
+        if (map[trimmed]) return map[trimmed];
+        // Soft fix: common patterns without spaces
+        return trimmed
+            .replace('오류가발생했습니다.', '오류가 발생했습니다.')
+            .replace('아래항목을포함하여', '아래 항목을 포함하여')
+            .replace('요구사항을구체적으로작성해주세요', '요구사항을 구체적으로 작성해 주세요')
+            .replace('현재환경', '현재 환경')
+            .replace('데이터출처형식규모', '데이터(출처/형식/규모)')
+            .replace('목표원하는결과', '목표(원하는 결과)')
+            .replace('제약시간예산보안등', '제약(시간/예산/보안 등)')
+            .replace(/\)+$/, ')');
     }
     
     /**
@@ -479,14 +528,14 @@ class ContextCollector {
             // Multiple choice validation
             const selectedOption = optionsContainer.querySelector('input[name="question-option"]:checked');
             if (!selectedOption) {
-                this.showError('Please select an option.');
+                this.showError('옵션을 선택해 주세요.');
                 return false;
             }
             
             if (selectedOption.value === 'custom') {
                 const customTextarea = this.container.querySelector('#custom-response');
                 if (!customTextarea || customTextarea.value.trim().length === 0) {
-                    this.showError('Please provide a custom response.');
+                    this.showError('직접 입력란을 작성해 주세요.');
                     return false;
                 }
             }
@@ -496,12 +545,12 @@ class ContextCollector {
             const response = textarea.value.trim();
             
             if (response.length === 0) {
-                this.showFieldError(textarea, 'Please provide a response.');
+                this.showFieldError(textarea, '답변을 입력해 주세요.');
                 return false;
             }
             
             if (response.length > 2000) {
-                this.showFieldError(textarea, 'Response cannot exceed 2000 characters.');
+                this.showFieldError(textarea, '답변은 2000자를 초과할 수 없습니다.');
                 return false;
             }
             
@@ -658,3 +707,7 @@ window.ContextCollector = ContextCollector;
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ContextCollector;
 }
+
+
+
+

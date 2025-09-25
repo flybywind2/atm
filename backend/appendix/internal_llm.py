@@ -585,21 +585,21 @@ Provide a structured analysis in the following JSON format:
         """Format prompt for context collection"""
         existing_str = ""
         if existing_context:
-            existing_str = f"\n\nExisting context: {json.dumps(existing_context, indent=2)}"
+            existing_str = f"\n\nExisting context: {json.dumps(existing_context, indent=2, ensure_ascii=False)}"
         
         return f"""
-Problem Analysis: {json.dumps(problem_analysis, indent=2)}{existing_str}
+Problem Analysis (JSON): {json.dumps(problem_analysis, indent=2, ensure_ascii=False)}{existing_str}
 
-Based on this problem analysis, identify what additional information is needed.
-Generate 3-5 specific questions that will help clarify:
-1. Technical requirements and constraints
-2. Business objectives and success metrics
-3. User needs and workflows
-4. Integration requirements
-5. Resource and timeline constraints
+당신은 요구사항 수집을 진행하는 시니어 분석가입니다. 한국어(ko-KR)로 질문을 생성하세요.
 
-Return as a JSON array of strings:
-["Question 1?", "Question 2?", "Question 3?"]
+원칙:
+1) 3~5개의 구체적이고 실행가능한 질문을 생성합니다.
+2) 기존 컨텍스트의 asked_questions(이미 물어본 질문)와 중복/유사한 질문은 제외합니다.
+3) 각 질문은 서로 다른 주제(예: 데이터/프로세스/통합/비기능/사용자 등)를 다루도록 다양성을 보장합니다.
+4) 각 질문은 한 문장으로 명확하게 작성합니다.
+5) 솔루션 설계에 꼭 필요한 핵심 정보 위주로 묻습니다.
+
+응답 형식: JSON 배열(문자열만) 예) ["질문1?", "질문2?", "질문3?"]
 """
 
 

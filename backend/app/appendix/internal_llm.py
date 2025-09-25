@@ -549,6 +549,34 @@ Focus on practical, executable guidance that developers can follow immediately.
         
         return prompts.get(agent_type, "You are a helpful AI assistant.")
 
+    @staticmethod
+    def format_context_collection_prompt(
+        problem_analysis: Dict[str, Any],
+        existing_context: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Format prompt for generating context questions (Korean)."""
+        existing_str = ""
+        if existing_context:
+            try:
+                existing_str = f"\n\nExisting context: {json.dumps(existing_context, indent=2, ensure_ascii=False)}"
+            except Exception:
+                existing_str = f"\n\nExisting context: {str(existing_context)}"
+
+        return f"""
+Problem Analysis (JSON): {json.dumps(problem_analysis, indent=2, ensure_ascii=False)}{existing_str}
+
+당신은 요구사항 수집을 진행하는 시니어 분석가입니다. 한국어(ko-KR)로 질문을 생성하세요.
+
+원칙:
+1) 3~5개의 구체적이고 실행가능한 질문을 생성합니다.
+2) 기존 컨텍스트의 asked_questions(이미 물어본 질문)와 중복/유사한 질문은 제외합니다.
+3) 각 질문은 서로 다른 주제(데이터/프로세스/통합/비기능/사용자 등)를 다루도록 다양성을 보장합니다.
+4) 각 질문은 한 문장으로 명확하게 작성합니다.
+5) 솔루션 설계에 꼭 필요한 핵심 정보 위주로 묻습니다.
+
+응답 형식: JSON 배열(문자열만) 예) ["질문1?", "질문2?", "질문3?"]
+"""
+
 
 class LLMAgentService:
     """High-level service for agent-specific LLM operations"""
@@ -556,6 +584,40 @@ class LLMAgentService:
     def __init__(self, llm_manager: Optional[LLMManager] = None):
         self.llm_manager = llm_manager or LLMManager()
         self.templates = AgentPromptTemplates()
+
+    async def collect_context_questions(
+        self,
+        problem_analysis: Dict[str, Any],
+        existing_context: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
+        """Generate 3–5 clarifying questions in Korean as a JSON array of strings.
+
+        Ensures output is a list[str] and filters out empty items.
+        """
+        system_prompt = self.templates.get_system_prompt(AgentType.CONTEXT_COLLECTOR)
+        user_prompt = self.templates.format_context_collection_prompt(problem_analysis, existing_context)
+
+        response = await self.llm_manager.simple_completion(
+            user_prompt,
+            system_message=system_prompt,
+            temperature=0.4
+        )
+
+        try:
+            parsed = json.loads(response)
+            if isinstance(parsed, list):
+                return [str(q).strip() for q in parsed if q]
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse context questions as JSON; using fallback")
+
+        # Fallback default Korean questions
+        return [
+            "이 솔루션이 해결해야 하는 핵심 사용자 시나리오는 무엇인가요?",
+            "연동이 필요한 내부/외부 시스템이나 API가 있나요? 있다면 어떤 용도인가요?",
+            "처리해야 할 데이터의 출처와 형식, 예상 규모는 어떻게 되나요?",
+            "성능·보안·가용성 등 비기능 요구사항에서 반드시 충족해야 할 기준이 있나요?",
+            "초기 목표 일정과 예산(대략치) 또는 운영 상 제약이 있나요?"
+        ]
     
     async def analyze_problem(
         self,

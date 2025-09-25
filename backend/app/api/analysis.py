@@ -157,7 +157,32 @@ async def get_status(
     # Check if there are questions waiting for user input
     questions = []
     if workflow_data.get("requires_input"):
-        questions = workflow_state.get("context_questions", [])
+        raw_questions = (
+            workflow_state.get("context_questions") or
+            workflow_state.get("pending_questions") or
+            workflow_state.get("questions") or
+            []
+        )
+        # Normalize questions to strings for API schema
+        norm_questions = []
+        if isinstance(raw_questions, (list, tuple)):
+            for q in raw_questions:
+                if isinstance(q, dict):
+                    text = q.get("text") or q.get("question") or q.get("content") or ""
+                    examples = q.get("examples") if isinstance(q.get("examples"), (list, tuple)) else None
+                    if examples:
+                        try:
+                            example_lines = "\n".join(f"- {e}" for e in examples)
+                            text = (text + "\n" + example_lines).strip()
+                        except Exception:
+                            pass
+                    norm_questions.append(text or str(q))
+                else:
+                    norm_questions.append(str(q))
+        else:
+            if raw_questions:
+                norm_questions.append(str(raw_questions))
+        questions = norm_questions
     
     # Get partial results if available - check both state and final results
     results = {}
@@ -498,8 +523,9 @@ async def resume_langgraph_workflow(thread_id: str, updated_state: ProblemSolvin
             # Resume workflow execution from where it left off
             accumulated_results = workflow_data.get("results", {})  # Get existing results
             result = None
+            # Provide updated_state directly since in-memory checkpointer has no persisted checkpoints
             async for output in compiled_workflow.astream(
-                None,  # Continue from checkpoint
+                updated_state,
                 config=thread_config,
                 stream_mode="values"
             ):

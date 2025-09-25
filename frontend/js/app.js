@@ -110,7 +110,7 @@ class ProblemSolvingApp {
      */
     async onContextSubmit(contextData) {
         try {
-            this.showLoadingOverlay('Processing additional information...');
+            this.showLoadingOverlay('추가 정보를 처리하는 중...');
             
             // Resume workflow with user input
             await this.apiClient.resumeWorkflow(this.threadId, contextData);
@@ -187,20 +187,9 @@ class ProblemSolvingApp {
 
         // CRITICAL FIX: Update DocumentViewer with partial results in real-time
         if (status.results && Object.keys(status.results).length > 0) {
-            // Check if DocumentViewer is currently visible or should be shown
-            const currentComponent = this.currentStep;
-
-            // Show DocumentViewer if we have partial results and not in input collection mode
-            const isAwaiting = (status.status === 'awaiting_input');
-            if (currentComponent !== 'context-collector' && !isAwaiting) {
-                // Update header first to avoid flashing "completed"
-                if (this.components.documentViewer.setHeaderState) {
-                    this.components.documentViewer.setHeaderState(status.status === 'completed');
-                }
-                this.showComponent('document-viewer');
-                this.components.documentViewer.updatePartialResults(status.results, status.status === 'completed');
-                console.log('[REAL-TIME] Updated DocumentViewer with partial results:', Object.keys(status.results));
-            }
+            // 실시간 결과는 백그라운드로만 업데이트하고, 화면은 ProgressTracker 유지
+            this.components.documentViewer.updatePartialResults(status.results, status.status === 'completed');
+            console.log('[REAL-TIME] Buffered partial results for DocumentViewer:', Object.keys(status.results));
         }
 
         // Handle different workflow states
@@ -297,7 +286,7 @@ class ProblemSolvingApp {
     /**
      * Show loading overlay
      */
-    showLoadingOverlay(message = 'Processing...') {
+    showLoadingOverlay(message = '처리 중...') {
         let overlay = document.getElementById('loading-overlay');
         
         if (!overlay) {

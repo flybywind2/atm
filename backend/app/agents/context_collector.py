@@ -17,6 +17,40 @@ from datetime import datetime
 from app.workflows.state import WorkflowState
 from app.appendix.internal_llm import get_agent_service, LLMAgentService
 from app.appendix.rag_retrieve import enhance_llm_context
+from app.config import settings
+
+
+def _normalize_text(text: str) -> set:
+    try:
+        import re
+        t = text.lower()
+        t = re.sub(r"[\p{Punct}\s]+", " ", t)
+    except Exception:
+        t = text.lower()
+    tokens = t.split()
+    stop = {"은", "는", "이", "가", "을", "를", "에", "의", "와", "과", "또는", "그리고", "the", "a", "an", "to", "for", "of"}
+    return set(tok for tok in tokens if tok not in stop)
+
+
+def pick_diverse_question(candidates: list, asked: list, threshold: float = 0.5) -> str:
+    asked_sets = [_normalize_text(q) for q in (asked or [])]
+    for q in candidates or []:
+        if not q:
+            continue
+        qset = _normalize_text(q)
+        similar = False
+        for aset in asked_sets:
+            if not aset:
+                continue
+            inter = len(qset & aset)
+            union = len(qset | aset) or 1
+            if (inter / union) >= threshold:
+                similar = True
+                break
+        if not similar:
+            return q
+    # Fallback: return first
+    return (candidates or [None])[0]
 
 
 logger = logging.getLogger(__name__)
@@ -79,48 +113,130 @@ async def collect_context(state: WorkflowState) -> WorkflowState:
             )
         
         # Check if we need more context (auto-complete if RAG is disabled)
-        rag_enabled = os.getenv("RAG_SERVICE_ENABLED", "true").lower() == "true"
-        
-        # Auto-complete context collection if RAG is disabled
-        if not rag_enabled:
-            logger.info("RAG service is disabled, auto-completing context collection")
-            # Set context as complete since we can't collect more without RAG
+        rag_enabled = settings.RAG_SERVICE_ENABLED
+
+        # If RAG is disabled but HITL is enabled, ask LLM-generated questions
+        if not rag_enabled and settings.ENABLE_HUMAN_LOOP:
+            agent_service = await get_agent_service()
+            # Count how many LLM questions have been asked already
+            asked_count = 0
+            for msg in conversation_history:
+                if msg.get("sender") == "context_collector" and msg.get("message_type") == "question":
+                    if msg.get("metadata", {}).get("llm"):
+                        asked_count += 1
+
+            # If we have user input, we just processed it above. Decide next action:
+            if state.get("user_input"):
+                # Stop if sufficient context or asked 3+ questions
+                if context_data.get("sufficient_context") or asked_count >= 3:
+                    conversation_history.append({
+                        "sender": "context_collector",
+                        "recipient": "system",
+                        "message_type": "completion",
+                        "content": "Context collection completed via HITL (LLM questions).",
+                        "timestamp": datetime.now().isoformat(),
+                        "metadata": {"context_complete": True, "llm": True}
+                    })
+
+                    updated_state = state.copy()
+                    updated_state.update({
+                        "current_step": "context_collected",
+                        "current_status": "context_complete",
+                        "conversation_history": conversation_history,
+                        "context_data": context_data,
+                        "missing_information": [],
+                        "requires_user_input": False,
+                        "context_complete": True,
+                        "user_input": None,
+                        "pending_questions": []
+                    })
+                    return updated_state
+
+            # Generate list of questions from LLM (3~5)
+            # Build extended context with asked_questions and missing list
+            asked_questions = [
+                msg.get("content") for msg in conversation_history
+                if msg.get("sender") == "context_collector" and msg.get("message_type") == "question"
+            ]
+            llm_context = context_data.copy() if isinstance(context_data, dict) else {}
+            llm_context["asked_questions"] = asked_questions
+            llm_context["missing_information"] = missing_information
+            llm_context["missing_information"] = missing_information
+
+            try:
+                questions = await agent_service.collect_context_questions(problem_analysis, llm_context)
+                if not isinstance(questions, list) or len(questions) == 0:
+                    questions = []
+                else:
+                    # Ensure all items are strings
+                    questions = [str(q).strip() for q in questions if q]
+            except Exception as e:
+                logger.warning(f"LLM context questions failed: {e}")
+                questions = []
+
+            # Fallback to single intelligent question if list empty
+            if not questions:
+                q = await generate_intelligent_question(
+                    (missing_information[0] if missing_information else "additional_context"),
+                    problem_analysis,
+                    context_data,
+                    conversation_history
+                )
+                questions = [q]
+
+            # Pick a diverse next question
+            next_q = pick_diverse_question(questions, asked_questions)
+
+            # Determine next index for bookkeeping
+            next_idx = len(asked_questions)
+
             conversation_history.append({
                 "sender": "context_collector",
-                "recipient": "system",
-                "message_type": "completion",
-                "content": "Context collection completed (RAG disabled). Proceeding to requirements generation.",
+                "recipient": "user",
+                "message_type": "question",
+                "content": next_q,
                 "timestamp": datetime.now().isoformat(),
-                "metadata": {
-                    "context_complete": True,
-                    "rag_disabled": True
-                }
+                "metadata": {"llm": True, "index": next_idx}
             })
-            
+
             updated_state = state.copy()
             updated_state.update({
-                "current_step": "context_collected",
-                "current_status": "context_complete",
+                "current_step": "collecting_context",
+                "current_status": "awaiting_input",
                 "conversation_history": conversation_history,
-                "context_data": context_data or {"auto_complete": True},
-                "missing_information": [],
-                "requires_user_input": False,
-                "context_complete": True,
-                "user_input": None,
-                "pending_questions": []
+                "context_data": context_data,
+                "missing_information": missing_information,
+                "pending_questions": [next_q],
+                "requires_user_input": True,
+                "context_complete": False,
+                "user_input": None
             })
-            
-            logger.info("Context collection auto-completed (RAG disabled)")
             return updated_state
         
-        if missing_information and not context_data.get("sufficient_context", False) and rag_enabled:
-            # Generate the next intelligent question
-            next_question = await generate_intelligent_question(
-                missing_information[0], 
-                problem_analysis, 
-                context_data,
-                conversation_history
-            )
+        if not context_data.get("sufficient_context", False) and rag_enabled:
+            # Prefer LLM-generated list of questions to avoid repetition
+            asked_questions = [
+                msg.get("content") for msg in conversation_history
+                if msg.get("sender") == "context_collector" and msg.get("message_type") == "question"
+            ]
+            llm_context = context_data.copy() if isinstance(context_data, dict) else {}
+            llm_context["asked_questions"] = asked_questions
+            try:
+                agent_service = await get_agent_service()
+                questions = await agent_service.collect_context_questions(problem_analysis, llm_context)
+                # Pick a diverse next question
+                next_question = pick_diverse_question(questions, asked_questions)
+                if not next_question:
+                    # Fallback to single intelligent question
+                    mi = missing_information[0] if missing_information else "additional_context"
+                    next_question = await generate_intelligent_question(
+                        mi, problem_analysis, context_data, conversation_history
+                    )
+            except Exception:
+                mi = missing_information[0] if missing_information else "additional_context"
+                next_question = await generate_intelligent_question(
+                    mi, problem_analysis, context_data, conversation_history
+                )
             
             # Add agent question to conversation history
             conversation_history.append({
@@ -458,34 +574,25 @@ async def generate_intelligent_question(
                            if msg.get("sender") == "context_collector" and msg.get("message_type") == "question")
         
         question_prompt = f"""
-        You are an expert business analyst conducting a requirements gathering session.
-        Generate a clear, specific question to gather missing information.
-        
-        Context:
-        Problem: {problem_analysis.get('title', 'Unknown problem')}
-        Category: {problem_analysis.get('category', 'Unknown')}
-        Domain: {problem_analysis.get('domain', 'Unknown')}
-        
-        Missing Information Type: {missing_info_type}
-        
-        Current Context:
-        {json.dumps(context_data, indent=2)}
-        
-        Question Number: {question_count + 1}
-        
-        Generate a single, clear question that:
-        1. Is specific to the missing information type
-        2. Considers the problem context
-        3. Is easy for a non-technical user to understand
-        4. Helps gather actionable information for solution design
-        5. Uses a friendly, professional tone
-        
-        Examples of good questions:
-        - "How often do you currently perform this process? (daily, weekly, monthly)"
-        - "What file formats do you typically work with? (Excel, CSV, PDF, etc.)"
-        - "Who are the main users of this system? (employees, customers, managers)"
-        
-        Generate only the question text, no additional formatting or explanation.
+        당신은 요구사항 수집을 진행하는 시니어 분석가입니다.
+        아래 정보를 참고해 부족한 정보를 채우기 위한 구체적인 질문을 한국어(ko-KR)로 한 문장 생성하세요.
+
+        맥락:
+        - 문제: {problem_analysis.get('title', '알 수 없음')}
+        - 분류: {problem_analysis.get('category', '알 수 없음')}
+        - 도메인: {problem_analysis.get('domain', '알 수 없음')}
+        - 부족한 정보 유형: {missing_info_type}
+        - 현재 컨텍스트(JSON):
+        {json.dumps(context_data, indent=2, ensure_ascii=False)}
+
+        작성 원칙:
+        1) {missing_info_type}에 정확히 해당하는 정보를 이끌어낼 수 있어야 합니다.
+        2) 비전문가도 이해할 수 있게 간결하고 명확하게 묻습니다.
+        3) 실행가능한 답을 유도합니다(예: 범주/단위/예시 포함).
+        4) 친절하고 전문적인 톤으로 한 문장만 출력합니다.
+        5) 기존에 물어본 질문(asked_questions)이 있다면 유사/중복 금지.
+
+        출력: 질문 한 문장만 출력 (기타 설명/포맷 금지)
         """
         
         # Get the LLM agent service
@@ -560,7 +667,7 @@ def handle_context_error(state: WorkflowState, error_message: str) -> WorkflowSt
         "sender": "context_collector",
         "recipient": "system",
         "message_type": "error",
-        "content": f"Context collection error: {error_message}",
+        "content": f"컨텍스트 수집 중 오류: {error_message}",
         "timestamp": datetime.now().isoformat(),
         "metadata": {"error_type": "context_collection_error"}
     })
@@ -575,7 +682,15 @@ def handle_context_error(state: WorkflowState, error_message: str) -> WorkflowSt
         "retry_count": state.get("retry_count", 0) + 1,
         "requires_user_input": True,
         "context_complete": False,
-        "pending_questions": ["I encountered an error. Could you please provide more details about your requirements?"]
+        "pending_questions": [{
+            "text": "오류가 발생했습니다. 아래 항목을 포함하여 요구사항을 구체적으로 작성해 주세요.",
+            "examples": [
+                "현재 환경(서버/OS/네트워크)",
+                "데이터(출처/형식/규모)",
+                "목표(원하는 결과)",
+                "제약(시간/예산/보안 등)"
+            ]
+        }]
     })
     
     return updated_state
