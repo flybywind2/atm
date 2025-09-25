@@ -11,6 +11,7 @@ import asyncio
 import json
 import logging
 import time
+import os
 from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
@@ -725,7 +726,20 @@ async def enhance_llm_context(agent_type: str, query: str, current_context: Dict
     Returns:
         Enhanced context with RAG-retrieved information
     """
+    # Check if RAG service is enabled
+    rag_enabled = os.getenv("RAG_SERVICE_ENABLED", "true").lower() == "true"
+    
+    if not rag_enabled:
+        logger.info("RAG service is disabled, returning original context")
+        enhanced_context = current_context.copy()
+        enhanced_context["rag_enhanced"] = False
+        enhanced_context["rag_disabled"] = True
+        enhanced_context["retrieved_context"] = []
+        enhanced_context["context_sources"] = []
+        return enhanced_context
+    
     try:
+        logger.info(f"RAG service enabled, enhancing context for {agent_type}")
         rag_service = await get_rag_service()
         async with rag_service:
             enhanced_context = await rag_service.enhance_agent_context(
@@ -752,7 +766,15 @@ async def retrieve_solution_examples(problem_type: str, tech_stack: List[str],
     Returns:
         List of solution examples with metadata
     """
+    # Check if RAG service is enabled
+    rag_enabled = os.getenv("RAG_SERVICE_ENABLED", "true").lower() == "true"
+    
+    if not rag_enabled:
+        logger.info("RAG service is disabled, returning empty solution examples")
+        return []
+    
     try:
+        logger.info(f"RAG service enabled, retrieving solutions for {problem_type}")
         rag_service = await get_rag_service()
         async with rag_service:
             solutions = await rag_service.search_solutions(problem_type, tech_stack, domain)
@@ -782,7 +804,15 @@ async def get_technology_recommendations(requirements: Dict[str, Any]) -> List[D
     Returns:
         List of technology recommendations
     """
+    # Check if RAG service is enabled
+    rag_enabled = os.getenv("RAG_SERVICE_ENABLED", "true").lower() == "true"
+    
+    if not rag_enabled:
+        logger.info("RAG service is disabled, returning empty technology recommendations")
+        return []
+    
     try:
+        logger.info("RAG service enabled, getting technology recommendations")
         rag_service = await get_rag_service()
         async with rag_service:
             recommendations = await rag_service.get_tech_recommendations(requirements)

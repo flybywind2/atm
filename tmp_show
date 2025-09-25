@@ -212,7 +212,6 @@ class ProgressTrackerComponent {
             'analyze_problem': 'analyze',
             'problem_analyzed': 'analyze',
             'collect_context': 'context',
-            'collecting_context': 'context',
             'context_collected': 'context',
             'generate_requirements': 'requirements',
             'requirements_generated': 'requirements',
@@ -221,17 +220,6 @@ class ProgressTrackerComponent {
             'create_guide': 'guide',
             'guide_created': 'guide'
         };
-        const statusToStep = {
-            'analyzing': 'analyze',
-            'collecting_context': 'context',
-            'awaiting_input': 'context',
-            'generating_requirements': 'requirements',
-            'designing_solution': 'solution',
-            'creating_guide': 'guide',
-            'processing': stepMapping[currentStep] || 'analyze',
-            'completed': 'guide'
-        };
-        const activeStepType = statusToStep[normalizedStatus] || stepMapping[currentStep];
         
         stepItems.forEach(item => {
             const stepType = item.dataset.step;
@@ -241,7 +229,7 @@ class ProgressTrackerComponent {
             item.classList.remove('active', 'completed', 'error');
             
             // Determine step status
-            if (activeStepType === stepType) {
+            if (stepMapping[currentStep] === stepType) {
                 if (normalizedStatus === 'error') {
                     item.classList.add('error');
                     statusElement.textContent = '❌';
@@ -256,7 +244,7 @@ class ProgressTrackerComponent {
             } else {
                 // Check if step is completed
                 const stepOrder = ['analyze', 'context', 'requirements', 'solution', 'guide'];
-                const currentIndex = stepOrder.indexOf(activeStepType);
+                const currentIndex = stepOrder.indexOf(stepMapping[currentStep]);
                 const stepIndex = stepOrder.indexOf(stepType);
 
                 if (stepIndex < currentIndex || normalizedStatus === 'completed') {
@@ -267,27 +255,6 @@ class ProgressTrackerComponent {
                     statusElement.textContent = '⏸️';
                     statusElement.classList.remove('spinning');
                 }
-            }
-        });
-        this.applyStepStatusEmojis(normalizedStatus);
-    }
-
-    /**
-     * Apply emojis to step status based on classes
-     */
-    applyStepStatusEmojis(normalizedStatus) {
-        const stepItems = this.container.querySelectorAll('.step-item');
-        stepItems.forEach(item => {
-            const statusEl = item.querySelector('.step-status');
-            if (!statusEl) return;
-            if (item.classList.contains('error')) {
-                statusEl.textContent = '❌';
-            } else if (item.classList.contains('completed')) {
-                statusEl.textContent = '✅';
-            } else if (item.classList.contains('active')) {
-                statusEl.textContent = (normalizedStatus === 'paused' || normalizedStatus === 'awaiting_input') ? '⏸️' : '🔄';
-            } else {
-                statusEl.textContent = '⏳';
             }
         });
     }
@@ -421,3 +388,4 @@ class ProgressTrackerComponent {
 
 // Export for global use
 window.ProgressTrackerComponent = ProgressTrackerComponent;
+

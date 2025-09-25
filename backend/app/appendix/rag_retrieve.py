@@ -8,6 +8,11 @@ importing from the main appendix implementation while providing backward compati
 # Import the main RAG implementation
 import sys
 import os
+import logging
+from typing import Dict, List, Any
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Add the root appendix directory to the path
 root_appendix_path = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'appendix')
@@ -27,10 +32,6 @@ try:
     )
 except ImportError:
     # Fallback implementations for testing when main module is not available
-    import logging
-    from typing import Dict, List, Any
-    
-    logger = logging.getLogger(__name__)
     
     async def enhance_llm_context(agent_type: str, query: str, current_context: Dict[str, Any],
                                 domain: str = None) -> Dict[str, Any]:

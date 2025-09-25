@@ -8,6 +8,7 @@ Implements the collect_context node for the LangGraph workflow.
 
 import json
 import logging
+import os
 from typing import List, Dict, Any
 from datetime import datetime
 
@@ -36,6 +37,11 @@ async def collect_context(state: WorkflowState) -> WorkflowState:
         Updated state with collected context or interrupt for user input
     """
     try:
+        # Force debug output to file
+        with open("debug_workflow.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== CONTEXT_COLLECTOR CALLED at {datetime.now()} ===\n")
+            f.write(f"State keys: {list(state.keys())}\n")
+
         logger.info("Starting context collection")
         
         problem_analysis = state.get("problem_analysis", {})
@@ -72,8 +78,42 @@ async def collect_context(state: WorkflowState) -> WorkflowState:
                 missing_information
             )
         
-        # Check if we need more context
-        if missing_information and not context_data.get("sufficient_context", False):
+        # Check if we need more context (auto-complete if RAG is disabled)
+        rag_enabled = os.getenv("RAG_SERVICE_ENABLED", "true").lower() == "true"
+        
+        # Auto-complete context collection if RAG is disabled
+        if not rag_enabled:
+            logger.info("RAG service is disabled, auto-completing context collection")
+            # Set context as complete since we can't collect more without RAG
+            conversation_history.append({
+                "sender": "context_collector",
+                "recipient": "system",
+                "message_type": "completion",
+                "content": "Context collection completed (RAG disabled). Proceeding to requirements generation.",
+                "timestamp": datetime.now().isoformat(),
+                "metadata": {
+                    "context_complete": True,
+                    "rag_disabled": True
+                }
+            })
+            
+            updated_state = state.copy()
+            updated_state.update({
+                "current_step": "context_collected",
+                "current_status": "context_complete",
+                "conversation_history": conversation_history,
+                "context_data": context_data or {"auto_complete": True},
+                "missing_information": [],
+                "requires_user_input": False,
+                "context_complete": True,
+                "user_input": None,
+                "pending_questions": []
+            })
+            
+            logger.info("Context collection auto-completed (RAG disabled)")
+            return updated_state
+        
+        if missing_information and not context_data.get("sufficient_context", False) and rag_enabled:
             # Generate the next intelligent question
             next_question = await generate_intelligent_question(
                 missing_information[0], 

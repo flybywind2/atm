@@ -22,44 +22,77 @@ logger = logging.getLogger(__name__)
 async def generate_requirements(state: WorkflowState) -> WorkflowState:
     """
     Generate comprehensive requirements documentation using LLM integration.
-    
+
     Creates functional and non-functional requirements, user stories,
     and acceptance criteria based on problem analysis and context.
     Generates both structured data and markdown SRS document.
-    
+
     Args:
         state: Current workflow state
-        
+
     Returns:
         Updated state with generated requirements
     """
     try:
-        logger.info("Starting requirements generation")
-        
+        # Force debug output to file
+        with open("debug_workflow.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== REQUIREMENTS_GENERATOR CALLED at {datetime.now()} ===\n")
+            f.write(f"State keys: {list(state.keys())}\n")
+
+        logger.info("=== STARTING REQUIREMENTS GENERATION ===")
+        logger.info(f"Current state keys: {list(state.keys())}")
+
         problem_analysis = state.get("problem_analysis", {})
         context_data = state.get("context_data", {})
         conversation_history = state.get("conversation_history", [])
+
+        logger.info(f"Problem analysis: {problem_analysis}")
+        logger.info(f"Context data keys: {list(context_data.keys()) if context_data else 'No context data'}")
         
         # Enhance context with RAG for requirements generation
-        enhanced_context = await enhance_llm_context(
-            agent_type="requirements_generator",
-            query=f"requirements specification {problem_analysis.get('category', '')} {problem_analysis.get('domain', '')}",
-            current_context=context_data,
-            domain="business_automation"
-        )
-        
+        logger.info("Enhancing context with RAG...")
+        try:
+            enhanced_context = await enhance_llm_context(
+                agent_type="requirements_generator",
+                query=f"requirements specification {problem_analysis.get('category', '')} {problem_analysis.get('domain', '')}",
+                current_context=context_data,
+                domain="business_automation"
+            )
+            logger.info(f"Enhanced context obtained: {type(enhanced_context)}")
+        except Exception as e:
+            logger.error(f"RAG enhancement failed: {str(e)}")
+            enhanced_context = context_data
+
         # Generate structured requirements using LLM with RAG enhancement
-        requirements_structure = await generate_structured_requirements(problem_analysis, enhanced_context)
-        
+        logger.info("Generating structured requirements...")
+        try:
+            requirements_structure = await generate_structured_requirements(problem_analysis, enhanced_context)
+            logger.info(f"Requirements structure generated with keys: {list(requirements_structure.keys())}")
+        except Exception as e:
+            logger.error(f"Structured requirements generation failed: {str(e)}")
+            requirements_structure = generate_fallback_requirements(problem_analysis, enhanced_context)
+
         # Generate user journey map with enhanced context
-        user_journey_map = await generate_user_journey_map(problem_analysis, enhanced_context)
-        
+        logger.info("Generating user journey map...")
+        try:
+            user_journey_map = await generate_user_journey_map(problem_analysis, enhanced_context)
+            logger.info(f"User journey map generated, length: {len(user_journey_map)}")
+        except Exception as e:
+            logger.error(f"User journey map generation failed: {str(e)}")
+            user_journey_map = create_fallback_journey_map(problem_analysis, enhanced_context)
+
         # Create comprehensive SRS document with enhanced context
-        srs_document = await create_srs_document(
-            problem_analysis, 
-            enhanced_context, 
-            requirements_structure
-        )
+        logger.info("Creating SRS document...")
+        try:
+            srs_document = await create_srs_document(
+                problem_analysis,
+                enhanced_context,
+                requirements_structure
+            )
+            logger.info(f"SRS document generated, length: {len(srs_document)}")
+        except Exception as e:
+            logger.error(f"SRS document generation failed: {str(e)}")
+            srs_document = create_fallback_srs(problem_analysis, enhanced_context, requirements_structure)
         
         # Update conversation history
         conversation_history.append({
@@ -83,14 +116,18 @@ async def generate_requirements(state: WorkflowState) -> WorkflowState:
             "conversation_history": conversation_history,
             "requirements_doc": srs_document,
             "requirements_definition": srs_document,
+            "requirements_document": srs_document,  # Add frontend-expected key
             "user_journey_map": user_journey_map,
             "requires_user_input": False,
             # Store structured components for other agents
             **requirements_structure
         })
-        
-        logger.info("Requirements generation completed successfully")
-        
+
+        logger.info("=== REQUIREMENTS GENERATION COMPLETED ===")
+        logger.info(f"Final state keys: {list(updated_state.keys())}")
+        logger.info(f"Requirements document length: {len(srs_document)}")
+        logger.info(f"User journey map length: {len(user_journey_map)}")
+
         return updated_state
         
     except Exception as e:
@@ -373,41 +410,22 @@ async def generate_user_journey_map(
     """
     try:
         journey_prompt = f"""
-        You are an expert UX designer and business analyst. Create a comprehensive user journey map
-        that shows the current state (as-is) and future state (to-be) of the user experience.
-        
-        Problem Analysis:
-        {json.dumps(problem_analysis, indent=2)}
-        
-        Context Data:
-        {json.dumps(context_data, indent=2)}
-        
-        Create a detailed user journey map in markdown format that includes:
-        
-        1. **Current State (As-Is Process)**
-           - Current steps and pain points
-           - Time required for each step
-           - User emotions and frustrations
-           - Tools and systems currently used
-        
-        2. **Future State (To-Be Process)**
-           - Improved process with automation
-           - Time savings and efficiency gains
-           - Enhanced user experience
-           - New tools and capabilities
-        
-        3. **Touchpoints and Interactions**
-           - User interface touchpoints
-           - System integrations
-           - Data flows
-        
-        4. **Success Metrics and KPIs**
-           - Measurable improvements
-           - User satisfaction metrics
-           - Efficiency gains
-        
-        Use markdown formatting with headers, bullet points, and tables where appropriate.
-        Make it specific to the problem domain: {problem_analysis.get('domain', 'Business Process')}
+        당신은 UX 디자이너이자 비즈니스 분석가입니다. 아래 정보를 바탕으로
+        한국어(ko-KR)로 현재(As-Is)와 개선 후(To-Be) 사용자 여정을 마크다운으로 작성하세요.
+
+        Problem Analysis(JSON):
+        {json.dumps(problem_analysis, indent=2, ensure_ascii=False)}
+
+        Context Data(JSON):
+        {json.dumps(context_data, indent=2, ensure_ascii=False)}
+
+        포함할 내용:
+        1) 현재 상태(As-Is): 단계별 활동, 소요 시간, 주요 불편/리스크, 사용 도구
+        2) 목표 상태(To-Be): 자동화로 인한 개선점, 시간/비용 절감, UX 향상, 신규 역량
+        3) 접점/인터랙션: UI 터치포인트, 시스템 연동, 데이터 흐름
+        4) 성공 지표: 정량/정성 KPI
+
+        표/목록을 적절히 사용하고, 도메인({problem_analysis.get('domain', 'Business Process')}) 특화 용어를 사용하세요.
         """
         
         # Get the LLM agent service
@@ -560,59 +578,48 @@ async def create_srs_document(
         Complete SRS document in markdown
     """
     try:
+        title = problem_analysis.get("title", "소프트웨어 솔루션")
         srs_prompt = f"""
-        You are an expert technical writer and business analyst. Create a comprehensive 
-        Software Requirements Specification (SRS) document in markdown format.
-        
-        Problem Analysis:
-        {json.dumps(problem_analysis, indent=2)}
-        
-        Context Data:
-        {json.dumps(context_data, indent=2)}
-        
-        Requirements Structure:
-        {json.dumps(requirements_structure, indent=2)}
-        
-        Create a professional SRS document with the following structure:
-        
-        # Software Requirements Specification
-        
-        ## 1. Introduction
-        ### 1.1 Purpose and Scope
-        ### 1.2 Product Overview
-        ### 1.3 Definitions and Acronyms
-        
-        ## 2. Overall Description
-        ### 2.1 Product Perspective
-        ### 2.2 Product Functions
-        ### 2.3 User Classes and Characteristics
-        ### 2.4 Operating Environment
-        ### 2.5 Design and Implementation Constraints
-        
-        ## 3. System Features and Requirements
-        ### 3.1 Functional Requirements
-        ### 3.2 Non-Functional Requirements
-        ### 3.3 User Stories and Acceptance Criteria
-        
-        ## 4. External Interface Requirements
-        ### 4.1 User Interfaces
-        ### 4.2 Hardware Interfaces
-        ### 4.3 Software Interfaces
-        ### 4.4 Communication Interfaces
-        
-        ## 5. Quality Attributes
-        ### 5.1 Performance Requirements
-        ### 5.2 Security Requirements
-        ### 5.3 Reliability Requirements
-        ### 5.4 Usability Requirements
-        
-        ## 6. Other Requirements
-        ### 6.1 Business Rules
-        ### 6.2 Constraints and Assumptions
-        ### 6.3 Success Criteria
-        
-        Make it professional, comprehensive, and specific to the problem domain.
-        Include all details from the requirements structure provided.
+        당신은 뛰어난 기술 문서 작성자이자 비즈니스 분석가입니다. 아래 정보를 바탕으로
+        한국어(ko-KR)로 완전한 소프트웨어 요구사항 명세서(SRS)를 마크다운 형식으로 작성하세요.
+
+        - H1 제목은 반드시 다음을 그대로 사용하세요: "소프트웨어 요구사항 명세서 (SRS) - {title}"
+        - 문제 도메인과 맥락에 맞는 한국어 용어를 사용하세요.
+        - 표와 목록을 적절히 활용하고, 요구사항은 테스트 가능하도록 구체적으로 작성하세요.
+
+        Problem Analysis(JSON):
+        {json.dumps(problem_analysis, indent=2, ensure_ascii=False)}
+
+        Context Data(JSON):
+        {json.dumps(context_data, indent=2, ensure_ascii=False)}
+
+        Requirements Structure(JSON):
+        {json.dumps(requirements_structure, indent=2, ensure_ascii=False)}
+
+        문서 구성 가이드(참고):
+        # 소프트웨어 요구사항 명세서 (SRS) - {title}
+        ## 1. 개요(Introduction)
+        ### 1.1 목적 및 범위
+        ### 1.2 시스템 개요
+        ### 1.3 용어 정의
+
+        ## 2. 전반적 설명(Overall Description)
+        ### 2.1 시스템 관점
+        ### 2.2 주요 기능
+        ### 2.3 사용자 분류 및 특성
+        ### 2.4 운영 환경
+        ### 2.5 제약사항
+
+        ## 3. 요구사항(System Features and Requirements)
+        ### 3.1 기능 요구사항(식별자, 설명, 수용 기준 포함)
+        ### 3.2 비기능 요구사항(성능/보안/신뢰성/사용성 등)
+        ### 3.3 사용자 스토리 및 수용 기준
+
+        ## 4. 외부 인터페이스 요구사항
+        ## 5. 품질 속성
+        ## 6. 기타 요구사항(업무 규칙, 가정/제약, 성공 기준)
+
+        전문적이고 도메인에 특화된 내용으로 작성하세요.
         """
         
         # Get the LLM agent service
@@ -645,8 +652,8 @@ def create_fallback_srs(
     Returns:
         SRS document in markdown
     """
-    title = problem_analysis.get("title", "Software Solution")
-    domain = problem_analysis.get("domain", "Business Process")
+    title = problem_analysis.get("title", "소프트웨어 솔루션")
+    domain = problem_analysis.get("domain", "업무 프로세스")
     
     # Build functional requirements section
     functional_reqs = requirements_structure.get("functional_requirements", [])
@@ -660,45 +667,44 @@ def create_fallback_srs(
     for story in user_stories:
         stories_section += f"- **{story.get('id', 'US-XXX')}**: {story.get('role', 'As a user')}, {story.get('goal', 'I want functionality')}, {story.get('benefit', 'so that I get value')}\n"
     
-    srs_document = f"""# Software Requirements Specification: {title}
+    srs_document = f"""# 소프트웨어 요구사항 명세서 (SRS) - {title}
 
-## 1. Introduction
+## 1. 개요(Introduction)
 
-### 1.1 Purpose
-This document specifies the requirements for the {title} system in the {domain} domain. It serves as a comprehensive guide for system design, development, and testing.
+### 1.1 목적
+본 문서는 {domain} 도메인에서 {title} 시스템의 요구사항을 정의합니다. 설계/개발/테스트의 기준 문서로 사용됩니다.
 
-### 1.2 Scope
-The system addresses: {problem_analysis.get('current_state', 'Current manual processes')}
-The desired outcome is: {problem_analysis.get('desired_state', 'Automated solution')}
+### 1.2 범위
+- 현재 상태: {problem_analysis.get('current_state', '수작업 중심의 현행 프로세스')}
+- 목표 상태: {problem_analysis.get('desired_state', '자동화를 통한 효율화')}
 
-### 1.3 Stakeholders
-{chr(10).join(f"- {stakeholder}" for stakeholder in problem_analysis.get('stakeholders', ['End Users']))}
+### 1.3 이해관계자
+{chr(10).join(f"- {stakeholder}" for stakeholder in problem_analysis.get('stakeholders', ['최종 사용자']))}
 
-## 2. Overall Description
+## 2. 전반적 설명(Overall Description)
 
-### 2.1 Product Perspective
-This is a {problem_analysis.get('category', 'GENERAL')} solution designed to improve {domain} processes.
+### 2.1 시스템 관점
+이 시스템은 {problem_analysis.get('category', 'GENERAL')} 유형의 솔루션으로, {domain} 프로세스 개선을 목표로 합니다.
 
-### 2.2 Product Functions
-The system will provide the following key functions:
-- Automated processing of user requests
-- Intelligent analysis and recommendations
-- Comprehensive reporting and documentation
-- Error handling and recovery
+### 2.2 주요 기능
+- 사용자 요청 자동 처리
+- 지능형 분석 및 추천
+- 보고서/문서화 제공
+- 오류 처리 및 복구 기능
 
-### 2.3 User Classes
-Primary users include:
-{chr(10).join(f"- {stakeholder}" for stakeholder in problem_analysis.get('stakeholders', ['End Users']))}
+### 2.3 사용자 분류
+주요 사용자:
+{chr(10).join(f"- {stakeholder}" for stakeholder in problem_analysis.get('stakeholders', ['최종 사용자']))}
 
-### 2.4 Operating Environment
-- **Platform**: Python-based solution
-- **Dependencies**: Standard Python libraries and specified packages
-- **Integration**: Compatible with existing business systems
+### 2.4 운영 환경
+- **플랫폼**: Python 기반
+- **의존성**: 표준 라이브러리 및 명시된 패키지
+- **연동**: 기존 업무 시스템과의 연계 지원
 
-### 2.5 Constraints
-{chr(10).join(f"- {constraint.get('description', 'Constraint')}" for constraint in requirements_structure.get('constraints', []))}
+### 2.5 제약사항
+{chr(10).join(f"- {constraint.get('description', '제약사항')}" for constraint in requirements_structure.get('constraints', []))}
 
-## 3. Functional Requirements
+## 3. 기능 요구사항(Functional Requirements)
 
 {functional_section}
 

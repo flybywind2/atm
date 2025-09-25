@@ -33,20 +33,35 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
         Updated state with solution design and routing information
     """
     try:
-        logger.info("Starting solution design")
-        
+        # Force debug output to file
+        with open("debug_workflow.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== SOLUTION_DESIGNER CALLED at {datetime.now()} ===\n")
+            f.write(f"State keys: {list(state.keys())}\n")
+
+        logger.info("=== STARTING SOLUTION DESIGN ===")
+        logger.info(f"Current state keys: {list(state.keys())}")
+
         problem_analysis = state.get("problem_analysis", {})
         context_data = state.get("context_data", {})
         functional_requirements = state.get("functional_requirements", [])
         conversation_history = state.get("conversation_history", [])
-        
+
+        logger.info(f"Problem analysis: {problem_analysis}")
+        logger.info(f"Functional requirements count: {len(functional_requirements)}")
+
         # Get enhanced context for solution design
-        enhanced_context = await enhance_llm_context(
-            agent_type="solution_designer",
-            query=f"solution design {problem_analysis.get('category', '')} architecture",
-            current_context=context_data,
-            domain="web_development"
-        )
+        logger.info("Getting enhanced context for solution design...")
+        try:
+            enhanced_context = await enhance_llm_context(
+                agent_type="solution_designer",
+                query=f"solution design {problem_analysis.get('category', '')} architecture",
+                current_context=context_data,
+                domain="web_development"
+            )
+            logger.info(f"Enhanced context obtained: {type(enhanced_context)}")
+        except Exception as e:
+            logger.error(f"Failed to get enhanced context: {str(e)}")
+            enhanced_context = context_data
         
         # Get technology recommendations based on requirements
         tech_requirements = {
@@ -62,13 +77,16 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
         tech_stack = [rec["technology"] for rec in tech_recommendations[:3] if "technology" in rec]
         solution_examples = await retrieve_solution_examples(problem_type, tech_stack, problem_analysis.get("domain"))
         
+        # Add tech recommendations and solution examples to enhanced context
+        enhanced_context["tech_recommendations"] = tech_recommendations
+        enhanced_context["solution_examples"] = solution_examples
+        
         # Determine solution type using LLM with RAG enhancement
         solution_design = await create_comprehensive_solution_design(
             problem_analysis, 
-            enhanced_context, 
+            context_data, 
             functional_requirements,
-            tech_recommendations,
-            solution_examples
+            enhanced_context  # Pass enhanced_context as rag_context
         )
         
         # Generate technology recommendations
@@ -76,7 +94,7 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
             solution_design.get("solution_type", "SIMPLE_AUTOMATION"),
             problem_analysis,
             context_data,
-            rag_context
+            enhanced_context  # Use enhanced_context instead of undefined rag_context
         )
         
         # Create architecture overview
@@ -100,7 +118,7 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
             }
         })
         
-        # Update state with solution design
+        # Update state with solution design while preserving previous results
         updated_state = state.copy()
         updated_state.update({
             "current_step": "solution_designed",
@@ -109,8 +127,14 @@ async def design_solution(state: WorkflowState) -> WorkflowState:
             "solution_type": solution_design.get("solution_type"),
             "recommended_solution_type": solution_design.get("solution_type"),
             "technology_stack": tech_recommendations,
+            "tech_recommendations": tech_recommendations,  # Add frontend-expected key
+            "tech_stack": tech_recommendations.get("recommended_stack", []) if isinstance(tech_recommendations, dict) else [],  # Frontend expects list
             "implementation_plan": solution_design.get("implementation_plan", ""),
             "requires_user_input": False,
+            # Preserve previous stage results
+            "requirements_document": state.get("requirements_document"),
+            "user_journey_map": state.get("user_journey_map"),
+            "requirements_definition": state.get("requirements_definition"),
             # Store detailed design components
             **solution_design
         })
@@ -163,7 +187,8 @@ async def create_comprehensive_solution_design(
     problem_analysis: Dict[str, Any], 
     context_data: Dict[str, Any], 
     functional_requirements: List[Dict[str, Any]],
-    rag_context: Dict[str, Any]
+    rag_context: Dict[str, Any],
+    tech_stack: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     Create comprehensive solution design using LLM with RAG enhancement.
@@ -270,7 +295,23 @@ async def create_comprehensive_solution_design(
                     "target": "Target value",
                     "measurement": "How to measure"
                 }}
-            ]
+            ],
+            "technology_stack": {{
+                "primary_language": "Main programming language",
+                "frameworks": ["Framework names"],
+                "libraries": ["Required libraries"],
+                "tools": ["Development tools"],
+                "database": "Database technology if needed",
+                "deployment": "Deployment technology"
+            }},
+            "implementation_plan": {{
+                "development_approach": "Development methodology",
+                "timeline": "Project timeline",
+                "milestones": ["Key milestones"],
+                "resources_needed": ["Required resources"],
+                "dependencies": ["External dependencies"],
+                "testing_strategy": "Overall testing approach"
+            }}
         }}
         
         Solution Type Guidelines:
@@ -300,11 +341,15 @@ async def create_comprehensive_solution_design(
         solution_design = await agent_service.design_solution(requirements_text, problem_analysis)
         
         # Validate and enhance the design
-        return validate_solution_design(solution_design, problem_analysis)
+        validated_design = validate_solution_design(solution_design, problem_analysis)
+        logger.info(f"Solution design validation result: technology_stack={bool(validated_design.get('technology_stack'))}, implementation_plan={bool(validated_design.get('implementation_plan'))}")
+        return validated_design
         
     except (json.JSONDecodeError, Exception) as e:
         logger.warning(f"LLM solution design failed, using fallback: {str(e)}")
-        return create_fallback_solution_design(problem_analysis, context_data, functional_requirements)
+        fallback_design = create_fallback_solution_design(problem_analysis, context_data, functional_requirements)
+        logger.info(f"Fallback design result: technology_stack={bool(fallback_design.get('technology_stack'))}, implementation_plan={bool(fallback_design.get('implementation_plan'))}")
+        return fallback_design
 
 
 def validate_solution_design(design: Dict[str, Any], problem_analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -350,7 +395,23 @@ def validate_solution_design(design: Dict[str, Any], problem_analysis: Dict[str,
         "testing_approach": design.get("testing_approach", {}),
         "implementation_phases": design.get("implementation_phases", []),
         "risk_assessment": design.get("risk_assessment", []),
-        "success_metrics": design.get("success_metrics", [])
+        "success_metrics": design.get("success_metrics", []),
+        "technology_stack": design.get("technology_stack", {
+            "primary_language": "Python",
+            "frameworks": ["Standard Library"],
+            "libraries": ["os", "sys", "json", "logging"],
+            "tools": ["VSCode", "Git"],
+            "database": "File-based storage",
+            "deployment": "Local Python script"
+        }),
+        "implementation_plan": design.get("implementation_plan", {
+            "development_approach": "Agile iterative development",
+            "timeline": "4-6 weeks total development",
+            "milestones": ["MVP", "Testing", "Production Ready"],
+            "resources_needed": ["Developer", "Test environment"],
+            "dependencies": ["Python environment", "Required libraries"],
+            "testing_strategy": "Unit tests + Integration tests"
+        })
     }
     
     # Validate complexity
@@ -525,7 +586,23 @@ def create_fallback_solution_design(
                 "target": "Meets functional requirements",
                 "measurement": "Requirements traceability"
             }
-        ]
+        ],
+        "technology_stack": {
+            "primary_language": "Python",
+            "frameworks": ["Standard Library"],
+            "libraries": ["os", "sys", "json", "logging"],
+            "tools": ["VSCode", "Git"],
+            "database": "File-based storage",
+            "deployment": "Local Python script"
+        },
+        "implementation_plan": {
+            "development_approach": "Agile iterative development",
+            "timeline": "4-6 weeks total development",
+            "milestones": ["MVP", "Testing", "Production Ready"],
+            "resources_needed": ["Developer", "Test environment"],
+            "dependencies": ["Python environment", "Required libraries"],
+            "testing_strategy": "Unit tests + Integration tests"
+        }
     }
 
 

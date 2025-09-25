@@ -12,7 +12,7 @@ class ProblemSolvingApp {
         this.threadId = null;
         this.pollingInterval = null;
         this.components = {};
-        this.apiClient = new APIClient('http://localhost:8000/api/v1');
+        this.apiClient = new APIClient(`${window.location.origin}/api/v1`);
         
         this.init();
     }
@@ -23,7 +23,11 @@ class ProblemSolvingApp {
     init() {
         this.initializeComponents();
         this.setupEventListeners();
-        this.showComponent('problem-input-container');
+        
+        // Wait for DOM to be fully ready before showing component
+        setTimeout(() => {
+            this.showComponent('problem-input-container');
+        }, 100);
         
         console.log('AI Problem Solving Copilot initialized');
     }
@@ -45,12 +49,12 @@ class ProblemSolvingApp {
         );
         
         // Initialize progress tracker component
-        this.components.progressTracker = new ProgressTracker(
+        this.components.progressTracker = new ProgressTrackerComponent(
             'progress-tracker'
         );
         
         // Initialize document viewer component
-        this.components.documentViewer = new DocumentViewer(
+        this.components.documentViewer = new DocumentViewerComponent(
             'document-viewer'
         );
     }
@@ -83,25 +87,21 @@ class ProblemSolvingApp {
      */
     async onProblemSubmit(problemData) {
         try {
-            this.showLoadingOverlay('Starting problem analysis...');
-            
+            // Transition to progress tracking immediately (no loading overlay)
+            this.showComponent('progress-tracker');
+
             // Start analysis via API
             const response = await this.apiClient.startAnalysis(problemData);
-            
+
             this.threadId = response.thread_id;
-            this.hideLoadingOverlay();
-            
-            // Transition to progress tracking
-            this.showComponent('progress-tracker');
             this.components.progressTracker.setThreadId(this.threadId);
             this.startProgressPolling();
-            
+
             // Update browser history
             history.pushState({ step: 'progress-tracker' }, '', '#progress');
-            
+
         } catch (error) {
-            this.hideLoadingOverlay();
-            this.showErrorModal('Failed to start problem analysis: ' + error.message);
+            this.showErrorModal('분석 시작에 실패했습니다: ' + error.message);
         }
     }
     
@@ -133,12 +133,12 @@ class ProblemSolvingApp {
     startProgressPolling() {
         this.stopProgressPolling(); // Clear any existing polling
         
+        // Start polling immediately and more frequently during initial phase
+        this.pollStatus();  // Immediate first check
+
         this.pollingInterval = setInterval(async () => {
             await this.pollStatus();
-        }, 2000); // Poll every 2 seconds
-        
-        // Initial status check
-        this.pollStatus();
+        }, 500); // Poll every 500ms for maximum responsiveness
     }
     
     /**
@@ -184,28 +184,46 @@ class ProblemSolvingApp {
     handleStatusUpdate(status) {
         // Update progress tracker
         this.components.progressTracker.updateStatus(status);
-        
+
+        // CRITICAL FIX: Update DocumentViewer with partial results in real-time
+        if (status.results && Object.keys(status.results).length > 0) {
+            // Check if DocumentViewer is currently visible or should be shown
+            const currentComponent = this.currentStep;
+
+            // Show DocumentViewer if we have partial results and not in input collection mode
+            const isAwaiting = (status.status === 'awaiting_input');
+            if (currentComponent !== 'context-collector' && !isAwaiting) {
+                // Update header first to avoid flashing "completed"
+                if (this.components.documentViewer.setHeaderState) {
+                    this.components.documentViewer.setHeaderState(status.status === 'completed');
+                }
+                this.showComponent('document-viewer');
+                this.components.documentViewer.updatePartialResults(status.results, status.status === 'completed');
+                console.log('[REAL-TIME] Updated DocumentViewer with partial results:', Object.keys(status.results));
+            }
+        }
+
         // Handle different workflow states
         switch (status.status) {
-            case 'waiting_for_input':
+            case 'awaiting_input':
                 this.stopProgressPolling();
                 this.handleUserInputRequired(status);
                 break;
-                
+
             case 'completed':
                 this.stopProgressPolling();
                 this.handleWorkflowCompleted(status);
                 break;
-                
+
             case 'error':
                 this.stopProgressPolling();
                 this.showErrorModal('Workflow execution error: ' + (status.message || 'Unknown error'));
                 break;
-                
+
             case 'processing':
-                // Continue polling
+                // Continue polling - real-time updates handled above
                 break;
-                
+
             default:
                 // Continue polling for other statuses
                 break;

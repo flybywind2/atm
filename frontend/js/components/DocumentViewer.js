@@ -1,8 +1,8 @@
 /**
  * Document Viewer Component
  * 
- * This component displays the final analysis results including generated documents,
- * with support for multiple document types and export functionality.
+ * This component displays the generated analysis results including requirements document,
+ * user journey map, implementation guide, and technical recommendations.
  */
 
 class DocumentViewerComponent {
@@ -12,11 +12,708 @@ class DocumentViewerComponent {
         this.currentDocument = null;
         this.solutionInfo = {};
         
+        if (!this.container) {
+            throw new Error(`Container with ID '${containerId}' not found`);
+        }
+        
         this.render();
         this.setupEventListeners();
+        // Default header: processing state until completion
+        if (typeof this.setHeaderState === 'function') {
+            this.setHeaderState(false);
+        }
     }
     
     /**
      * Render the component HTML
      */
-    render() {\n        this.container.innerHTML = `\n            <div class=\"document-viewer\">\n                <div class=\"results-header\">\n                    <div class=\"completion-status\">\n                        <span class=\"status-icon\">✅</span>\n                        <h3>분석 완료!</h3>\n                        <p>문제 분석이 성공적으로 완료되었습니다. 아래에서 결과를 확인하세요.</p>\n                    </div>\n                    \n                    <div id=\"solution-summary\" class=\"solution-summary hidden\">\n                        <div class=\"summary-item\">\n                            <label>솔루션 유형:</label>\n                            <span id=\"solution-type\">-</span>\n                        </div>\n                        <div class=\"summary-item\">\n                            <label>추천 기술 스택:</label>\n                            <div id=\"tech-stack\" class=\"tech-stack\"></div>\n                        </div>\n                    </div>\n                </div>\n                \n                <div class=\"document-tabs\">\n                    <button class=\"tab-button active\" data-doc=\"requirements\">\n                        📋 요구사항 명세서\n                    </button>\n                    <button class=\"tab-button\" data-doc=\"journey\">\n                        🗺️ 사용자 여정 지도\n                    </button>\n                    <button class=\"tab-button\" data-doc=\"guide\">\n                        📚 구현 가이드\n                    </button>\n                    <button class=\"tab-button\" data-doc=\"tech\">\n                        🔧 기술 추천서\n                    </button>\n                </div>\n                \n                <div class=\"document-content-container\">\n                    <div id=\"document-content\" class=\"document-content\">\n                        <div class=\"loading-state\">\n                            <p>문서를 불러오는 중...</p>\n                        </div>\n                    </div>\n                    \n                    <div class=\"document-actions\">\n                        <button type=\"button\" class=\"btn btn-primary\" id=\"download-btn\">\n                            📥 다운로드\n                        </button>\n                        \n                        <button type=\"button\" class=\"btn btn-outline\" id=\"copy-btn\">\n                            📋 복사\n                        </button>\n                        \n                        <button type=\"button\" class=\"btn btn-outline\" id=\"print-btn\">\n                            🖨️ 인쇄\n                        </button>\n                        \n                        <div class=\"action-group\">\n                            <button type=\"button\" class=\"btn btn-outline\" id=\"download-all-btn\">\n                                📦 전체 다운로드\n                            </button>\n                            \n                            <button type=\"button\" class=\"btn btn-outline\" id=\"new-analysis-btn\">\n                                🔄 새 분석 시작\n                            </button>\n                        </div>\n                    </div>\n                </div>\n                \n                <div id=\"export-options\" class=\"export-options hidden\">\n                    <h4>내보내기 옵션</h4>\n                    <div class=\"export-formats\">\n                        <button class=\"format-btn\" data-format=\"markdown\">\n                            📝 Markdown (.md)\n                        </button>\n                        <button class=\"format-btn\" data-format=\"html\">\n                            🌐 HTML (.html)\n                        </button>\n                        <button class=\"format-btn\" data-format=\"pdf\">\n                            📄 PDF (.pdf)\n                        </button>\n                        <button class=\"format-btn\" data-format=\"txt\">\n                            📃 텍스트 (.txt)\n                        </button>\n                    </div>\n                </div>\n            </div>\n        `;\n    }\n    \n    /**\n     * Setup event listeners\n     */\n    setupEventListeners() {\n        const tabButtons = this.container.querySelectorAll('.tab-button');\n        const downloadBtn = this.container.querySelector('#download-btn');\n        const copyBtn = this.container.querySelector('#copy-btn');\n        const printBtn = this.container.querySelector('#print-btn');\n        const downloadAllBtn = this.container.querySelector('#download-all-btn');\n        const newAnalysisBtn = this.container.querySelector('#new-analysis-btn');\n        const formatButtons = this.container.querySelectorAll('.format-btn');\n        \n        // Tab switching\n        tabButtons.forEach(button => {\n            button.addEventListener('click', () => {\n                const docType = button.dataset.doc;\n                this.switchDocument(docType);\n                \n                // Update active tab\n                tabButtons.forEach(btn => btn.classList.remove('active'));\n                button.classList.add('active');\n            });\n        });\n        \n        // Document actions\n        downloadBtn.addEventListener('click', () => this.downloadCurrentDocument());\n        copyBtn.addEventListener('click', () => this.copyCurrentDocument());\n        printBtn.addEventListener('click', () => this.printCurrentDocument());\n        downloadAllBtn.addEventListener('click', () => this.downloadAllDocuments());\n        newAnalysisBtn.addEventListener('click', () => this.startNewAnalysis());\n        \n        // Export format selection\n        formatButtons.forEach(button => {\n            button.addEventListener('click', () => {\n                const format = button.dataset.format;\n                this.exportCurrentDocument(format);\n            });\n        });\n    }\n    \n    /**\n     * Display analysis results\n     */\n    displayResults(results) {\n        this.documents = results.documents || {};\n        this.solutionInfo = {\n            type: results.solution_type,\n            techStack: results.tech_stack || []\n        };\n        \n        // Update solution summary\n        this.updateSolutionSummary();\n        \n        // Display first document\n        this.switchDocument('requirements');\n    }\n    \n    /**\n     * Update solution summary section\n     */\n    updateSolutionSummary() {\n        const summaryElement = this.container.querySelector('#solution-summary');\n        const solutionTypeElement = this.container.querySelector('#solution-type');\n        const techStackElement = this.container.querySelector('#tech-stack');\n        \n        if (this.solutionInfo.type) {\n            solutionTypeElement.textContent = this.getSolutionTypeLabel(this.solutionInfo.type);\n            \n            if (this.solutionInfo.techStack && this.solutionInfo.techStack.length > 0) {\n                techStackElement.innerHTML = this.solutionInfo.techStack\n                    .map(tech => `<span class=\"tech-tag\">${tech}</span>`)\n                    .join('');\n            } else {\n                techStackElement.textContent = '정보 없음';\n            }\n            \n            summaryElement.classList.remove('hidden');\n        }\n    }\n    \n    /**\n     * Get human-readable solution type label\n     */\n    getSolutionTypeLabel(type) {\n        const labels = {\n            'SIMPLE_AUTOMATION': '기본 자동화',\n            'COMPLEX_AUTOMATION': '고급 자동화',\n            'RAG': '검색 증강 생성',\n            'ADVANCED_RAG': '고급 RAG',\n            'ML_CLASSIFICATION': '머신러닝 분류',\n            'DASHBOARD': '대시보드',\n            'API_INTEGRATION': 'API 통합',\n            'RAG_AUTOMATION': 'RAG + 자동화',\n            'AUTOMATION_DASHBOARD': '자동화 + 대시보드',\n            'ML_RAG': '머신러닝 + RAG'\n        };\n        \n        return labels[type] || type;\n    }\n    \n    /**\n     * Switch to a different document\n     */\n    switchDocument(docType) {\n        this.currentDocument = docType;\n        \n        const contentElement = this.container.querySelector('#document-content');\n        \n        const documentMap = {\n            'requirements': 'requirements_document',\n            'journey': 'user_journey_map', \n            'guide': 'implementation_guide',\n            'tech': 'tech_recommendations'\n        };\n        \n        const documentKey = documentMap[docType];\n        const documentContent = this.documents[documentKey];\n        \n        if (documentContent) {\n            // Render markdown content\n            const htmlContent = window.MarkdownRenderer.renderWithContainer(\n                documentContent, \n                'markdown-content'\n            );\n            contentElement.innerHTML = htmlContent;\n            \n            // Initialize syntax highlighting if available\n            if (window.hljs) {\n                contentElement.querySelectorAll('pre code').forEach(block => {\n                    window.hljs.highlightElement(block);\n                });\n            }\n        } else {\n            contentElement.innerHTML = `\n                <div class=\"no-content\">\n                    <p>⚠️ 이 문서는 아직 생성되지 않았습니다.</p>\n                    <p>분석이 완료되지 않았거나 오류가 발생했을 수 있습니다.</p>\n                </div>\n            `;\n        }\n        \n        // Scroll to top\n        contentElement.scrollTop = 0;\n    }\n    \n    /**\n     * Download current document\n     */\n    downloadCurrentDocument() {\n        if (!this.currentDocument) return;\n        \n        const documentMap = {\n            'requirements': { key: 'requirements_document', filename: '요구사항_명세서.md' },\n            'journey': { key: 'user_journey_map', filename: '사용자_여정_지도.md' },\n            'guide': { key: 'implementation_guide', filename: '구현_가이드.md' },\n            'tech': { key: 'tech_recommendations', filename: '기술_추천서.md' }\n        };\n        \n        const docInfo = documentMap[this.currentDocument];\n        const content = this.documents[docInfo.key];\n        \n        if (content) {\n            window.MarkdownRenderer.createDownloadableContent(content, docInfo.filename);\n        }\n    }\n    \n    /**\n     * Copy current document to clipboard\n     */\n    async copyCurrentDocument() {\n        if (!this.currentDocument) return;\n        \n        const documentMap = {\n            'requirements': 'requirements_document',\n            'journey': 'user_journey_map',\n            'guide': 'implementation_guide', \n            'tech': 'tech_recommendations'\n        };\n        \n        const documentKey = documentMap[this.currentDocument];\n        const content = this.documents[documentKey];\n        \n        if (content) {\n            const success = await window.MarkdownRenderer.copyToClipboard(content);\n            \n            if (success) {\n                this.showToast('문서가 클립보드에 복사되었습니다!', 'success');\n            } else {\n                this.showToast('복사에 실패했습니다. 브라우저가 지원하지 않을 수 있습니다.', 'error');\n            }\n        }\n    }\n    \n    /**\n     * Print current document\n     */\n    printCurrentDocument() {\n        const contentElement = this.container.querySelector('#document-content');\n        const content = contentElement.innerHTML;\n        \n        const printWindow = window.open('', '_blank');\n        printWindow.document.write(`\n            <!DOCTYPE html>\n            <html>\n            <head>\n                <title>분석 결과 - ${this.getDocumentTitle()}</title>\n                <style>\n                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }\n                    .markdown-content { max-width: none; }\n                    pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; }\n                    code { background: #f0f0f0; padding: 0.2rem 0.4rem; border-radius: 2px; }\n                    table { border-collapse: collapse; width: 100%; }\n                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }\n                    th { background-color: #f2f2f2; }\n                </style>\n            </head>\n            <body>\n                ${content}\n            </body>\n            </html>\n        `);\n        printWindow.document.close();\n        printWindow.print();\n    }\n    \n    /**\n     * Download all documents as a ZIP file\n     */\n    downloadAllDocuments() {\n        // This would require a ZIP library or server-side support\n        // For now, download documents individually\n        Object.keys(this.documents).forEach((key, index) => {\n            setTimeout(() => {\n                const docType = this.getDocTypeFromKey(key);\n                if (docType) {\n                    this.currentDocument = docType;\n                    this.downloadCurrentDocument();\n                }\n            }, index * 500); // Stagger downloads\n        });\n        \n        this.showToast('모든 문서 다운로드를 시작합니다.', 'info');\n    }\n    \n    /**\n     * Get document type from key\n     */\n    getDocTypeFromKey(key) {\n        const mapping = {\n            'requirements_document': 'requirements',\n            'user_journey_map': 'journey',\n            'implementation_guide': 'guide',\n            'tech_recommendations': 'tech'\n        };\n        return mapping[key];\n    }\n    \n    /**\n     * Export current document in specified format\n     */\n    exportCurrentDocument(format) {\n        if (!this.currentDocument) return;\n        \n        const documentMap = {\n            'requirements': 'requirements_document',\n            'journey': 'user_journey_map',\n            'guide': 'implementation_guide',\n            'tech': 'tech_recommendations'\n        };\n        \n        const documentKey = documentMap[this.currentDocument];\n        const content = this.documents[documentKey];\n        \n        if (!content) return;\n        \n        const filename = this.getDocumentTitle();\n        \n        switch (format) {\n            case 'markdown':\n                window.MarkdownRenderer.createDownloadableContent(content, `${filename}.md`);\n                break;\n            case 'html':\n                const htmlContent = window.MarkdownRenderer.render(content);\n                const blob = new Blob([`<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>${filename}</title></head><body>${htmlContent}</body></html>`], { type: 'text/html' });\n                this.downloadBlob(blob, `${filename}.html`);\n                break;\n            case 'txt':\n                const textContent = window.MarkdownRenderer.extractText(content);\n                const textBlob = new Blob([textContent], { type: 'text/plain' });\n                this.downloadBlob(textBlob, `${filename}.txt`);\n                break;\n            case 'pdf':\n                this.showToast('PDF 내보내기는 아직 지원되지 않습니다.', 'warning');\n                break;\n        }\n    }\n    \n    /**\n     * Download blob as file\n     */\n    downloadBlob(blob, filename) {\n        const url = URL.createObjectURL(blob);\n        const link = document.createElement('a');\n        link.href = url;\n        link.download = filename;\n        link.style.display = 'none';\n        \n        document.body.appendChild(link);\n        link.click();\n        document.body.removeChild(link);\n        \n        URL.revokeObjectURL(url);\n    }\n    \n    /**\n     * Get current document title\n     */\n    getDocumentTitle() {\n        const titles = {\n            'requirements': '요구사항_명세서',\n            'journey': '사용자_여정_지도',\n            'guide': '구현_가이드',\n            'tech': '기술_추천서'\n        };\n        \n        return titles[this.currentDocument] || '문서';\n    }\n    \n    /**\n     * Start new analysis\n     */\n    startNewAnalysis() {\n        if (confirm('새로운 분석을 시작하면 현재 결과가 사라집니다. 계속하시겠습니까?')) {\n            // Reset application state\n            if (window.ProblemSolvingApp) {\n                window.ProblemSolvingApp.reset();\n            }\n        }\n    }\n    \n    /**\n     * Show toast notification\n     */\n    showToast(message, type = 'info') {\n        // Create toast element\n        const toast = document.createElement('div');\n        toast.className = `toast toast-${type}`;\n        toast.textContent = message;\n        \n        // Style the toast\n        toast.style.cssText = `\n            position: fixed;\n            top: 20px;\n            right: 20px;\n            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};\n            color: white;\n            padding: 12px 16px;\n            border-radius: 8px;\n            z-index: 1000;\n            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\n            opacity: 0;\n            transition: opacity 0.3s ease;\n        `;\n        \n        document.body.appendChild(toast);\n        \n        // Show toast\n        setTimeout(() => {\n            toast.style.opacity = '1';\n        }, 100);\n        \n        // Hide toast\n        setTimeout(() => {\n            toast.style.opacity = '0';\n            setTimeout(() => {\n                if (document.body.contains(toast)) {\n                    document.body.removeChild(toast);\n                }\n            }, 300);\n        }, 3000);\n    }\n    \n    /**\n     * Reset component\n     */\n    reset() {\n        this.documents = {};\n        this.currentDocument = null;\n        this.solutionInfo = {};\n        \n        // Reset to initial state\n        this.render();\n        this.setupEventListeners();\n    }\n}\n\n// Export for global use\nwindow.DocumentViewerComponent = DocumentViewerComponent;\n\n// Export for Node.js if needed\nif (typeof module !== 'undefined' && module.exports) {\n    module.exports = DocumentViewerComponent;\n}
+    render() {
+        this.container.innerHTML = `
+            <div class="document-viewer">
+                <div class="results-header">
+                    <div class="completion-status">
+                        <span class="status-icon">✅</span>
+                        <h3>분석 완료!</h3>
+                        <p>문제 분석이 성공적으로 완료되었습니다. 아래에서 결과를 확인하세요.</p>
+                    </div>
+                    
+                    <div id="solution-summary" class="solution-summary hidden">
+                        <div class="summary-item">
+                            <label>솔루션 유형:</label>
+                            <span id="solution-type">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <label>추천 기술 스택:</label>
+                            <div id="tech-stack" class="tech-stack"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="document-tabs">
+                    <button class="tab-button active" data-doc="requirements">
+                        📋 요구사항 명세서
+                    </button>
+                    <button class="tab-button" data-doc="journey">
+                        🗺️ 사용자 여정 지도
+                    </button>
+                    <button class="tab-button" data-doc="guide">
+                        📚 구현 가이드
+                    </button>
+                    <button class="tab-button" data-doc="tech">
+                        🔧 기술 추천서
+                    </button>
+                </div>
+                
+                <div class="document-content-container">
+                    <div id="document-content" class="document-content">
+                        <div class="loading-state">
+                            <p>문서를 불러오는 중...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="document-actions">
+                        <button type="button" class="btn btn-primary" id="download-btn">
+                            📥 다운로드
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline" id="copy-btn">
+                            📋 복사
+                        </button>
+                        
+                        <button type="button" class="btn btn-outline" id="print-btn">
+                            🖨️ 인쇄
+                        </button>
+                        
+                        <div class="action-group">
+                            <button type="button" class="btn btn-outline" id="download-all-btn">
+                                📦 전체 다운로드
+                            </button>
+                            
+                            <button type="button" class="btn btn-outline" id="new-analysis-btn">
+                                🔄 새 분석 시작
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * Setup event listeners
+     */
+    setupEventListeners() {
+        const tabButtons = this.container.querySelectorAll('.tab-button');
+        const downloadBtn = this.container.querySelector('#download-btn');
+        const copyBtn = this.container.querySelector('#copy-btn');
+        const printBtn = this.container.querySelector('#print-btn');
+        const downloadAllBtn = this.container.querySelector('#download-all-btn');
+        const newAnalysisBtn = this.container.querySelector('#new-analysis-btn');
+        
+        // Tab switching
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const docType = button.dataset.doc;
+                this.switchDocument(docType);
+                
+                // Update active tab
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+            });
+        });
+        
+        // Document actions
+        downloadBtn.addEventListener('click', () => this.downloadCurrentDocument());
+        copyBtn.addEventListener('click', () => this.copyCurrentDocument());
+        printBtn.addEventListener('click', () => this.printCurrentDocument());
+        downloadAllBtn.addEventListener('click', () => this.downloadAllDocuments());
+        newAnalysisBtn.addEventListener('click', () => this.startNewAnalysis());
+    }
+
+    /**
+     * Update header state (processing vs completed)
+     */
+    setHeaderState(isComplete = false) {
+        const box = this.container.querySelector('.completion-status');
+        if (!box) return;
+        const title = box.querySelector('h3');
+        const desc = box.querySelector('p');
+        const icon = box.querySelector('.status-icon');
+
+        if (isComplete) {
+            box.setAttribute('data-state', 'completed');
+            if (icon) icon.textContent = '✔️';
+            if (title) title.textContent = '분석 완료!';
+            if (desc) desc.textContent = '분석이 완료되었습니다. 아래에서 결과를 확인하세요.';
+        } else {
+            box.setAttribute('data-state', 'processing');
+            if (icon) icon.textContent = '⏳';
+            if (title) title.textContent = '분석 진행 중...';
+            if (desc) desc.textContent = '문서가 순차적으로 생성됩니다. 준비되는 대로 표시합니다.';
+        }
+    }
+    
+    /**
+     * Display analysis results
+     */
+    displayResults(results) {
+        this.documents = results || {};
+        this.solutionInfo = {
+            type: results.solution_type,
+            techStack: results.tech_stack || []
+        };
+
+        // Mark header as completed
+        this.setHeaderState(true);
+
+        // Update solution summary
+        this.updateSolutionSummary();
+
+        // Update tab indicators
+        this.updateTabIndicators();
+
+        // Display first document
+        this.switchDocument('requirements');
+    }
+
+    /**
+     * CRITICAL FIX: Update partial results in real-time
+     */
+    updatePartialResults(partialResults, isComplete = false) {
+        if (!partialResults) return;
+
+        // Merge partial results with existing documents
+        this.documents = { ...this.documents, ...partialResults };
+
+        // Update header state to reflect progress
+        this.setHeaderState(!!isComplete);
+
+        // Update solution info if available
+        if (partialResults.solution_type) {
+            this.solutionInfo.type = partialResults.solution_type;
+        }
+        if (partialResults.tech_stack) {
+            this.solutionInfo.techStack = partialResults.tech_stack;
+        }
+
+        // Update solution summary
+        this.updateSolutionSummary();
+
+        // Update tab indicators to show which documents are available
+        this.updateTabIndicators();
+
+        // If we're currently viewing a document that was just updated, refresh it
+        if (this.currentDocument) {
+            const documentMap = {
+                'requirements': 'requirements_document',
+                'journey': 'user_journey_map',
+                'guide': 'implementation_guide',
+                'tech': 'tech_recommendations'
+            };
+
+            const documentKey = documentMap[this.currentDocument];
+            if (partialResults[documentKey] && this.currentDocument) {
+                this.switchDocument(this.currentDocument);
+            }
+        } else {
+            // If no document is currently selected, show the first available one
+            const availableDocs = ['requirements', 'journey', 'guide', 'tech'];
+            const documentMap = {
+                'requirements': 'requirements_document',
+                'journey': 'user_journey_map',
+                'guide': 'implementation_guide',
+                'tech': 'tech_recommendations'
+            };
+
+            for (const docType of availableDocs) {
+                if (this.documents[documentMap[docType]]) {
+                    this.switchDocument(docType);
+                    break;
+                }
+            }
+        }
+
+        console.log('[DOCUMENT VIEWER] Updated with partial results:', Object.keys(partialResults));
+    }
+
+    /**
+     * Update tab indicators to show document availability status
+     */
+    updateTabIndicators() {
+        const documentMap = {
+            'requirements': 'requirements_document',
+            'journey': 'user_journey_map',
+            'guide': 'implementation_guide',
+            'tech': 'tech_recommendations'
+        };
+
+        const tabButtons = this.container.querySelectorAll('.tab-button');
+
+        tabButtons.forEach(button => {
+            const docType = button.dataset.doc;
+            const documentKey = documentMap[docType];
+
+            // Remove existing status classes
+            button.classList.remove('available', 'generating', 'pending');
+
+            if (this.documents[documentKey]) {
+                // Document is available
+                button.classList.add('available');
+                button.style.opacity = '1';
+
+                // Add visual indicator
+                if (!button.querySelector('.status-indicator')) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'status-indicator';
+                    indicator.textContent = '✅';
+                    indicator.style.cssText = 'margin-left: 5px; font-size: 12px;';
+                    button.appendChild(indicator);
+                }
+            } else {
+                // Document not yet available
+                button.classList.add('pending');
+                button.style.opacity = '0.6';
+
+                // Add pending indicator
+                if (!button.querySelector('.status-indicator')) {
+                    const indicator = document.createElement('span');
+                    indicator.className = 'status-indicator';
+                    indicator.textContent = '⏳';
+                    indicator.style.cssText = 'margin-left: 5px; font-size: 12px;';
+                    button.appendChild(indicator);
+                } else {
+                    const indicator = button.querySelector('.status-indicator');
+                    indicator.textContent = '⏳';
+                }
+            }
+        });
+    }
+    
+    /**
+     * Update solution summary section
+     */
+    updateSolutionSummary() {
+        const summaryElement = this.container.querySelector('#solution-summary');
+        const solutionTypeElement = this.container.querySelector('#solution-type');
+        const techStackElement = this.container.querySelector('#tech-stack');
+        
+        if (this.solutionInfo.type) {
+            solutionTypeElement.textContent = this.getSolutionTypeLabel(this.solutionInfo.type);
+            
+            if (this.solutionInfo.techStack && this.solutionInfo.techStack.length > 0) {
+                techStackElement.innerHTML = this.solutionInfo.techStack
+                    .map(tech => `<span class="tech-tag">${tech}</span>`)
+                    .join('');
+            } else {
+                techStackElement.textContent = '정보 없음';
+            }
+            
+            summaryElement.classList.remove('hidden');
+        }
+    }
+    
+    /**
+     * Get human-readable solution type label
+     */
+    getSolutionTypeLabel(type) {
+        const labels = {
+            'SIMPLE_AUTOMATION': '기본 자동화',
+            'COMPLEX_AUTOMATION': '고급 자동화',
+            'RAG': '검색 증강 생성',
+            'ADVANCED_RAG': '고급 RAG',
+            'ML_CLASSIFICATION': '머신러닝 분류',
+            'DASHBOARD': '대시보드',
+            'API_INTEGRATION': 'API 통합',
+            'RAG_AUTOMATION': 'RAG + 자동화',
+            'AUTOMATION_DASHBOARD': '자동화 + 대시보드',
+            'ML_RAG': '머신러닝 + RAG'
+        };
+        
+        return labels[type] || type;
+    }
+    
+    /**
+     * Switch to a different document
+     */
+    switchDocument(docType) {
+        this.currentDocument = docType;
+        
+        const contentElement = this.container.querySelector('#document-content');
+        
+        const documentMap = {
+            'requirements': 'requirements_document',
+            'journey': 'user_journey_map', 
+            'guide': 'implementation_guide',
+            'tech': 'tech_recommendations'
+        };
+        
+        const documentKey = documentMap[docType];
+        let documentContent = this.documents[documentKey];
+        
+        // Normalize non-string content (e.g., tech_recommendations object)
+        if (documentKey === 'tech_recommendations') {
+            documentContent = this.formatTechRecommendations(documentContent);
+        } else if (typeof documentContent !== 'string') {
+            documentContent = this.stringifyIfObject(documentContent);
+        }
+        
+        if (documentContent) {
+            // Render markdown content with proper handling
+            let htmlContent;
+            if (window.markdownRenderer && typeof window.markdownRenderer.render === 'function') {
+                try {
+                    htmlContent = `<div class="markdown-content">${window.markdownRenderer.render(documentContent)}</div>`;
+                } catch (error) {
+                    console.warn('MarkdownRenderer failed, using fallback:', error);
+                    htmlContent = `<div class="markdown-content"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f9fa; padding: 20px; border-radius: 8px; line-height: 1.5;">${documentContent}</pre></div>`;
+                }
+            } else {
+                // Fallback to pre-formatted text
+                htmlContent = `<div class="markdown-content"><pre style="white-space: pre-wrap; font-family: 'Courier New', monospace; background: #f8f9fa; padding: 20px; border-radius: 8px; line-height: 1.5;">${documentContent}</pre></div>`;
+            }
+                
+            contentElement.innerHTML = htmlContent;
+            
+            // Initialize syntax highlighting if available
+            if (window.hljs) {
+                contentElement.querySelectorAll('pre code').forEach(block => {
+                    window.hljs.highlightElement(block);
+                });
+            }
+        } else {
+            contentElement.innerHTML = `
+                <div class="no-content">
+                    <p>⚠️ 이 문서는 아직 생성되지 않았습니다.</p>
+                    <p>분석이 완료되지 않았거나 오류가 발생했을 수 있습니다.</p>
+                </div>
+            `;
+        }
+        
+        // Scroll to top
+        contentElement.scrollTop = 0;
+    }
+    
+    /**
+     * Download current document
+     */
+    downloadCurrentDocument() {
+        if (!this.currentDocument) return;
+        
+        const documentMap = {
+            'requirements': { key: 'requirements_document', filename: '요구사항_명세서.md' },
+            'journey': { key: 'user_journey_map', filename: '사용자_여정_지도.md' },
+            'guide': { key: 'implementation_guide', filename: '구현_가이드.md' },
+            'tech': { key: 'tech_recommendations', filename: '기술_추천서.md' }
+        };
+        
+        const docInfo = documentMap[this.currentDocument];
+        let content = this.documents[docInfo.key];
+        if (docInfo.key === 'tech_recommendations') {
+            content = this.formatTechRecommendations(content);
+        } else if (typeof content !== 'string') {
+            content = this.stringifyIfObject(content);
+        }
+        
+        if (content) {
+            this.downloadBlob(new Blob([content], { type: 'text/markdown' }), docInfo.filename);
+        }
+    }
+    
+    /**
+     * Copy current document to clipboard
+     */
+    async copyCurrentDocument() {
+        if (!this.currentDocument) return;
+        
+        const documentMap = {
+            'requirements': 'requirements_document',
+            'journey': 'user_journey_map',
+            'guide': 'implementation_guide', 
+            'tech': 'tech_recommendations'
+        };
+        
+        const documentKey = documentMap[this.currentDocument];
+        let content = this.documents[documentKey];
+        if (documentKey === 'tech_recommendations') {
+            content = this.formatTechRecommendations(content);
+        } else if (typeof content !== 'string') {
+            content = this.stringifyIfObject(content);
+        }
+        
+        if (content) {
+            try {
+                await navigator.clipboard.writeText(content);
+                this.showToast('문서가 클립보드에 복사되었습니다!', 'success');
+            } catch (err) {
+                this.showToast('복사에 실패했습니다. 브라우저가 지원하지 않을 수 있습니다.', 'error');
+            }
+        }
+    }
+
+    /**
+     * Convert tech recommendations object to readable Markdown
+     */
+    formatTechRecommendations(data) {
+        try {
+            if (!data) return '';
+            if (typeof data === 'string') return data;
+
+            const lines = [];
+            lines.push('# 기술추천서');
+
+            // 요약 섹션
+            const summary = [];
+            if (this.solutionInfo && this.solutionInfo.type) {
+                summary.push(`- 추천 솔루션 유형: ${this.solutionInfo.type}`);
+            }
+            if (data.complexity) summary.push(`- 복잡도: ${data.complexity}`);
+            if (data.domain) summary.push(`- 도메인: ${data.domain}`);
+            if (data.constraints && Array.isArray(data.constraints) && data.constraints.length) {
+                summary.push(`- 주요 제약: ${data.constraints.slice(0,3).map(c => typeof c === 'string' ? c : (c.description || c.type)).join(', ')}`);
+            }
+            if (summary.length) {
+                lines.push('', '## 요약', ...summary);
+            }
+
+            // 권장 아키텍처 구성 (테이블)
+            const stack = Array.isArray(data.recommended_stack) ? data.recommended_stack : null;
+            if (stack && stack.length) {
+                lines.push('', '## 권장 아키텍처 구성', '', '| 계층/구성요소 | 기술 | 근거 |', '|---|---|---|');
+                stack.forEach(s => {
+                    if (typeof s === 'string') {
+                        lines.push(`| - | ${s} | - |`);
+                    } else if (s && typeof s === 'object') {
+                        const layer = s.layer || s.category || s.component || '-';
+                        const tech = s.technology || s.name || '-';
+                        const reason = s.reason || s.rationale || s.justification || '';
+                        lines.push(`| ${layer} | ${tech} | ${reason} |`);
+                    }
+                });
+            }
+
+            // 추천 기술 (주요/보조)
+            const primary = Array.isArray(data.primary_technologies) ? data.primary_technologies : null;
+            const secondary = Array.isArray(data.secondary_technologies) ? data.secondary_technologies : null;
+            const asList = Array.isArray(data) ? data : null;
+
+            const renderTechList = (title, list) => {
+                if (!list || !list.length) return;
+                lines.push('', `## ${title}`);
+                list.forEach((t, idx) => {
+                    if (typeof t === 'string') {
+                        lines.push(`- **${t}**`);
+                    } else if (t && typeof t === 'object') {
+                        const name = t.technology || t.name || `항목 ${idx+1}`;
+                        const version = t.version ? ` (권장 버전: ${t.version})` : '';
+                        const why = t.reason || t.rationale || t.justification || '';
+                        lines.push(`- **${name}**${version}${why ? ` — ${why}` : ''}`);
+                        if (Array.isArray(t.alternatives) && t.alternatives.length) {
+                            lines.push(`  - 대안: ${t.alternatives.join(', ')}`);
+                        }
+                        if (t.license) lines.push(`  - 라이선스: ${t.license}`);
+                    }
+                });
+            };
+
+            if (primary || secondary || asList) {
+                renderTechList('주요기술', primary || asList);
+                if (secondary) renderTechList('보조기술', secondary);
+            }
+
+            // 통합/아키텍처/접점
+            if (data.integration_points || data.architecture_overview || data.implementation_approach) {
+                lines.push('', '## 통합 및 운영 고려사항');
+                if (Array.isArray(data.integration_points)) {
+                    data.integration_points.forEach(p => lines.push(`- 통합: ${typeof p === 'string' ? p : JSON.stringify(p)}`));
+                }
+                if (data.architecture_overview) {
+                    lines.push('', '### 아키텍처 개요', '', typeof data.architecture_overview === 'string' ? data.architecture_overview : '');
+                }
+                if (data.implementation_approach) {
+                    lines.push('', '### 구현 접근 방식', '', typeof data.implementation_approach === 'string' ? data.implementation_approach : '');
+                }
+            }
+
+            // 선정 근거/비고
+            if (data.rationale || data.notes) {
+                if (data.rationale) lines.push('', '## 선정 근거', '', typeof data.rationale === 'string' ? data.rationale : '');
+                if (data.notes) lines.push('', '## 비고', '', typeof data.notes === 'string' ? data.notes : '');
+            }
+
+            // 정보가 너무 적을 경우 JSON 표시
+            if (lines.length <= 4) {
+                return '```json\n' + JSON.stringify(data, null, 2) + '\n```';
+            }
+            return lines.join('\n');
+        } catch (e) {
+            return String(data ?? '');
+        }
+    }
+
+    /**
+     * Stringify generic objects safely to Markdown code block
+     */
+    stringifyIfObject(value) {
+        if (value == null) return '';
+        if (typeof value === 'string') return value;
+        try {
+            return '```json\n' + JSON.stringify(value, null, 2) + '\n```';
+        } catch {
+            return String(value);
+        }
+    }
+    
+    /**
+     * Print current document
+     */
+    printCurrentDocument() {
+        const contentElement = this.container.querySelector('#document-content');
+        const content = contentElement.innerHTML;
+        
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>분석 결과 - ${this.getDocumentTitle()}</title>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+                    .markdown-content { max-width: none; }
+                    pre { background: #f5f5f5; padding: 1rem; border-radius: 4px; }
+                    code { background: #f0f0f0; padding: 0.2rem 0.4rem; border-radius: 2px; }
+                    table { border-collapse: collapse; width: 100%; }
+                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                    th { background-color: #f2f2f2; }
+                </style>
+            </head>
+            <body>
+                ${content}
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
+    }
+    
+    /**
+     * Download all documents
+     */
+    downloadAllDocuments() {
+        Object.keys(this.documents).forEach((key, index) => {
+            setTimeout(() => {
+                const docType = this.getDocTypeFromKey(key);
+                if (docType) {
+                    this.currentDocument = docType;
+                    this.downloadCurrentDocument();
+                }
+            }, index * 500);
+        });
+        
+        this.showToast('모든 문서 다운로드를 시작합니다.', 'info');
+    }
+    
+    /**
+     * Get document type from key
+     */
+    getDocTypeFromKey(key) {
+        const mapping = {
+            'requirements_document': 'requirements',
+            'user_journey_map': 'journey',
+            'implementation_guide': 'guide',
+            'tech_recommendations': 'tech'
+        };
+        return mapping[key];
+    }
+    
+    /**
+     * Download blob as file
+     */
+    downloadBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        URL.revokeObjectURL(url);
+    }
+    
+    /**
+     * Get current document title
+     */
+    getDocumentTitle() {
+        const titles = {
+            'requirements': '요구사항_명세서',
+            'journey': '사용자_여정_지도',
+            'guide': '구현_가이드',
+            'tech': '기술_추천서'
+        };
+        
+        return titles[this.currentDocument] || '문서';
+    }
+    
+    /**
+     * Start new analysis
+     */
+    startNewAnalysis() {
+        if (confirm('새로운 분석을 시작하면 현재 결과가 사라집니다. 계속하시겠습니까?')) {
+            if (window.ProblemSolvingApp) {
+                window.ProblemSolvingApp.reset();
+            }
+        }
+    }
+    
+    /**
+     * Show toast notification
+     */
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => { toast.style.opacity = '1'; }, 100);
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => {
+                if (document.body.contains(toast)) {
+                    document.body.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+    
+    /**
+     * Reset component
+     */
+    reset() {
+        this.documents = {};
+        this.currentDocument = null;
+        this.solutionInfo = {};
+        
+        this.render();
+        this.setupEventListeners();
+    }
+}
+
+// Export for global use
+window.DocumentViewerComponent = DocumentViewerComponent;

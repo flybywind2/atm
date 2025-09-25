@@ -21,25 +21,35 @@ logger = logging.getLogger(__name__)
 async def create_guide(state: WorkflowState) -> WorkflowState:
     """
     Create comprehensive implementation guide using LLM integration.
-    
+
     Generates detailed build plans with code examples, testing strategies,
     and deployment instructions based on the designed solution.
-    
+
     Args:
         state: Current workflow state
-        
+
     Returns:
         Updated state with implementation guide
     """
     try:
-        logger.info("Starting implementation guide creation")
-        
+        # Force debug output to file
+        with open("debug_workflow.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== GUIDE_CREATOR CALLED at {datetime.now()} ===\n")
+            f.write(f"State keys: {list(state.keys())}\n")
+
+        logger.info("=== STARTING GUIDE CREATION ===")
+        logger.info(f"Current state keys: {list(state.keys())}")
+
         problem_analysis = state.get("problem_analysis", {})
         context_data = state.get("context_data", {})
         requirements_doc = state.get("requirements_definition", "")
         solution_design = state.get("solution_design", {})
         technology_stack = state.get("technology_stack", {})
         conversation_history = state.get("conversation_history", [])
+
+        logger.info(f"Requirements doc length: {len(requirements_doc)}")
+        logger.info(f"Solution design keys: {list(solution_design.keys()) if solution_design else 'No solution design'}")
+        logger.info(f"Technology stack keys: {list(technology_stack.keys()) if technology_stack else 'No technology stack'}")
         
         # Enhance context with RAG for implementation guide creation
         enhanced_context = await enhance_llm_context(
@@ -101,21 +111,35 @@ async def create_guide(state: WorkflowState) -> WorkflowState:
             }
         })
         
-        # Update state with generated guide and documentation
+        # Update state with generated guide and documentation while preserving previous results
         updated_state = state.copy()
         updated_state.update({
             "current_step": "guide_created",
             "current_status": "complete",
             "conversation_history": conversation_history,
             "implementation_plan": implementation_guide,
+            "implementation_guide": implementation_guide,  # Add frontend-expected key
             "technical_specifications": technical_specs,
             "deployment_checklist": deployment_checklist,
             "requires_user_input": False,
-            "workflow_complete": True
+            "workflow_complete": True,
+            # Preserve all previous stage results
+            "requirements_document": state.get("requirements_document"),
+            "user_journey_map": state.get("user_journey_map"),
+            "requirements_definition": state.get("requirements_definition"),
+            "solution_type": state.get("solution_type"),
+            "recommended_solution_type": state.get("recommended_solution_type"),
+            "technology_stack": state.get("technology_stack"),
+            "tech_recommendations": state.get("tech_recommendations"),
+            "tech_stack": state.get("tech_stack")
         })
-        
-        logger.info("Implementation guide creation completed successfully")
-        
+
+        logger.info("=== GUIDE CREATION COMPLETED ===")
+        logger.info(f"Final state keys: {list(updated_state.keys())}")
+        logger.info(f"Implementation guide length: {len(implementation_guide)}")
+        logger.info(f"Preserved requirements_document: {bool(updated_state.get('requirements_document'))}")
+        logger.info(f"Preserved user_journey_map: {bool(updated_state.get('user_journey_map'))}")
+
         return updated_state
         
     except Exception as e:
@@ -128,7 +152,8 @@ async def create_comprehensive_guide(
     context_data: Dict[str, Any],
     requirements_doc: str,
     solution_design: Dict[str, Any],
-    technology_stack: Dict[str, Any]
+    technology_stack: Dict[str, Any],
+    solution_examples: Dict[str, Any] = None
 ) -> str:
     """
     Create comprehensive implementation guide using LLM integration.
@@ -139,6 +164,7 @@ async def create_comprehensive_guide(
         requirements_doc: Requirements document
         solution_design: Solution design information
         technology_stack: Technology recommendations
+        solution_examples: Solution examples from RAG (optional)
         
     Returns:
         Comprehensive implementation guide in markdown

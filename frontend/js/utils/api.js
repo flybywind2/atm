@@ -7,13 +7,13 @@
  */
 
 class APIClient {
-    constructor(baseURL = 'http://localhost:8000/api/v1') {
+    constructor(baseURL = 'http://localhost:8080/api/v1') {
         this.baseURL = baseURL;
         this.defaultHeaders = {
             'Content-Type': 'application/json',
             'Accept': 'application/json'
         };
-        this.timeout = 30000; // 30 seconds timeout
+        this.timeout = 600000; // 10 minutes timeout - for long-running workflow operations
     }
     
     /**
@@ -77,7 +77,7 @@ class APIClient {
     
     /**
      * Start a new problem analysis
-     * POST /api/v1/start-analysis
+     * POST /api/v1/start
      */
     async startAnalysis(problemData) {
         const payload = {
@@ -123,7 +123,7 @@ class APIClient {
         
         const payload = {
             user_input: contextData.input || contextData.user_input,
-            additional_context: contextData.additional_context || {}
+            context_data: contextData.context_data || contextData.additional_context || {}
         };
         
         return await this.request(`/resume/${threadId}`, {

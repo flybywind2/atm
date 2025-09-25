@@ -27,6 +27,11 @@ class WorkflowState(TypedDict):
     solution_type: Optional[str]
     implementation_guide: Optional[str]
     
+    # Frontend-expected document keys
+    requirements_document: NotRequired[str]  # Frontend-expected key for requirements
+    tech_recommendations: NotRequired[str]  # Frontend-expected key for tech stack
+    tech_stack: NotRequired[List[str]]      # Frontend-expected tech stack list
+    
     # Workflow control (from agent spec)
     current_step: str
     pending_questions: List[str]

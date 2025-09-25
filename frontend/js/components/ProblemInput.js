@@ -23,74 +23,74 @@ class ProblemInput {
         this.container.innerHTML = `
             <div class="problem-input-container">
                 <div class="header">
-                    <h1>AI Problem Solving Copilot</h1>
-                    <p>Describe your problem and get comprehensive Python solutions with step-by-step guidance.</p>
+                    <h1>AI 문제 해결 코파일럿</h1>
+                    <p>문제를 설명하면 단계별 가이드와 함께 포괄적인 Python 솔루션을 제공합니다.</p>
                 </div>
                 
                 <form id="problem-input-form" class="problem-input-form">
                     <div class="form-group">
                         <label for="problem-description">
-                            Describe your problem in detail *
+                            문제를 자세히 설명해주세요 *
                         </label>
                         <textarea 
                             id="problem-description" 
                             class="form-control" 
                             rows="8"
-                            placeholder="Example: I need to automate monthly report generation. Currently I manually collect data from multiple Excel files, create charts, and insert them into PowerPoint. This process takes 3-4 hours and is prone to errors. I want to automate this to complete in under 30 minutes."
+                            placeholder="예시: 월간 보고서 생성을 자동화하고 싶습니다. 현재 여러 엑셀 파일에서 수동으로 데이터를 수집하고, 차트를 만들어 PowerPoint에 삽입하고 있습니다. 이 과정은 3-4시간이 걸리고 오류가 발생하기 쉽습니다. 30분 이내에 완료되도록 자동화하고 싶습니다."
                             required
                             maxlength="5000"
                         ></textarea>
                         <div class="form-help">
-                            💡 <strong>Tip:</strong> Include specific details about your current process, tools you use, expected outcomes, and any constraints for better analysis.
+                            💡 <strong>팁:</strong> 더 나은 분석을 위해 현재 프로세스, 사용하는 도구, 예상 결과 및 제약 사항에 대한 구체적인 세부 정보를 포함해주세요.
                         </div>
                         <div class="character-count">
-                            <span id="char-count">0</span> / 5000 characters
+                            <span id="char-count">0</span> / 5000 글자
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label>Additional Context (Optional)</label>
+                        <label>추가 정보 (선택사항)</label>
                         
                         <div class="context-section">
                             <div class="form-row">
                                 <div class="form-col">
-                                    <label for="experience-level">Programming Experience</label>
+                                    <label for="experience-level">프로그래밍 경험</label>
                                     <select id="experience-level" class="form-control">
-                                        <option value="">Select your level</option>
-                                        <option value="beginner">Beginner (New to Python)</option>
-                                        <option value="intermediate">Intermediate (Some experience)</option>
-                                        <option value="advanced">Advanced (Experienced developer)</option>
+                                        <option value="">수준을 선택하세요</option>
+                                        <option value="beginner">초급 (Python 처음 접함)</option>
+                                        <option value="intermediate">중급 (어느 정도 경험 있음)</option>
+                                        <option value="advanced">고급 (숙련된 개발자)</option>
                                     </select>
                                 </div>
                                 
                                 <div class="form-col">
-                                    <label for="urgency-level">Urgency</label>
+                                    <label for="urgency-level">긴급도</label>
                                     <select id="urgency-level" class="form-control">
-                                        <option value="">Select urgency</option>
-                                        <option value="high">High (Needed immediately)</option>
-                                        <option value="medium">Medium (Within 1-2 weeks)</option>
-                                        <option value="low">Low (No rush)</option>
+                                        <option value="">긴급도를 선택하세요</option>
+                                        <option value="high">높음 (즉시 필요)</option>
+                                        <option value="medium">보통 (1-2주 내)</option>
+                                        <option value="low">낮음 (서두르지 않음)</option>
                                     </select>
                                 </div>
                             </div>
                             
                             <div class="form-group">
-                                <label for="current-tools">Current Tools & Technologies</label>
-                                <input 
-                                    type="text" 
-                                    id="current-tools" 
+                                <label for="current-tools">현재 사용 중인 도구 및 기술</label>
+                                <input
+                                    type="text"
+                                    id="current-tools"
                                     class="form-control"
-                                    placeholder="e.g., Excel, PowerPoint, SQL Server, API endpoints, etc."
+                                    placeholder="예: Excel, PowerPoint, SQL Server, API 엔드포인트 등"
                                 >
                             </div>
                             
                             <div class="form-group">
-                                <label for="constraints">Constraints or Requirements</label>
-                                <textarea 
-                                    id="constraints" 
-                                    class="form-control" 
+                                <label for="constraints">제약사항 또는 요구사항</label>
+                                <textarea
+                                    id="constraints"
+                                    class="form-control"
                                     rows="3"
-                                    placeholder="e.g., Must use specific software, security requirements, budget limitations, performance needs, etc."
+                                    placeholder="예: 특정 소프트웨어 사용 필수, 보안 요구사항, 예산 제한, 성능 요구사항 등"
                                 ></textarea>
                             </div>
                         </div>
@@ -98,37 +98,37 @@ class ProblemInput {
                     
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary" id="submit-btn">
-                            <span class="btn-text">Start Analysis</span>
-                            <span class="btn-loading hidden">Starting...</span>
+                            <span class="btn-text">분석 시작</span>
+                            <span class="btn-loading hidden">시작하는 중...</span>
                         </button>
                         
                         <button type="button" class="btn btn-outline" id="reset-btn">
-                            Reset Form
+                            폼 초기화
                         </button>
                     </div>
                 </form>
                 
                 <div class="examples-section">
-                    <h3>Example Problem Descriptions</h3>
+                    <h3>문제 설명 예시</h3>
                     <div class="examples-grid">
                         <div class="example-card" data-example="automation">
-                            <h4>🤖 Process Automation</h4>
-                            <p>Automate repetitive tasks like data collection and report generation</p>
+                            <h4>🤖 프로세스 자동화</h4>
+                            <p>데이터 수집 및 보고서 생성과 같은 반복적인 작업을 자동화</p>
                         </div>
                         
                         <div class="example-card" data-example="data-analysis">
-                            <h4>📊 Data Analysis</h4>
-                            <p>Analyze large datasets and create visualization dashboards</p>
+                            <h4>📊 데이터 분석</h4>
+                            <p>대용량 데이터셋 분석 및 시각화 대시보드 생성</p>
                         </div>
                         
                         <div class="example-card" data-example="integration">
-                            <h4>🔗 System Integration</h4>
-                            <p>Connect multiple systems and automate data synchronization</p>
+                            <h4>🔗 시스템 통합</h4>
+                            <p>여러 시스템을 연결하고 데이터 동기화 자동화</p>
                         </div>
                         
                         <div class="example-card" data-example="web-scraping">
-                            <h4>🕷️ Web Scraping</h4>
-                            <p>Extract data from websites automatically and regularly</p>
+                            <h4>🕷️ 웹 스크래핑</h4>
+                            <p>웹사이트에서 자동으로 정기적으로 데이터 추출</p>
                         </div>
                     </div>
                 </div>
@@ -211,12 +211,12 @@ class ProblemInput {
         this.clearFieldError(textarea);
         
         if (description.length > 0 && description.length < 20) {
-            this.showFieldError(textarea, 'Please provide a more detailed description (at least 20 characters).');
+            this.showFieldError(textarea, '더 자세한 설명을 제공해주세요 (최소 20자).');
             return false;
         }
-        
+
         if (description.length > 5000) {
-            this.showFieldError(textarea, 'Description cannot exceed 5000 characters.');
+            this.showFieldError(textarea, '설명은 5000자를 초과할 수 없습니다.');
             return false;
         }
         
@@ -254,7 +254,7 @@ class ProblemInput {
         } catch (error) {
             console.error('Form submission error:', error);
             this.setSubmittingState(false);
-            this.showFormError('Failed to start analysis. Please try again.');
+            this.showFormError('분석 시작에 실패했습니다. 다시 시도해주세요.');
         }
     }
     
@@ -287,19 +287,19 @@ class ProblemInput {
         const description = textarea.value.trim();
         
         if (description.length === 0) {
-            this.showFieldError(textarea, 'Problem description is required.');
+            this.showFieldError(textarea, '문제 설명이 필요합니다.');
             textarea.focus();
             return false;
         }
         
         if (description.length < 20) {
-            this.showFieldError(textarea, 'Please provide a more detailed description (at least 20 characters).');
+            this.showFieldError(textarea, '더 자세한 설명을 제공해주세요 (최소 20자).');
             textarea.focus();
             return false;
         }
-        
+
         if (description.length > 5000) {
-            this.showFieldError(textarea, 'Description cannot exceed 5000 characters.');
+            this.showFieldError(textarea, '설명은 5000자를 초과할 수 없습니다.');
             textarea.focus();
             return false;
         }

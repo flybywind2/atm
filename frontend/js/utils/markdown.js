@@ -22,8 +22,8 @@ class MarkdownRenderer {
             return;
         }
         
-        // Configure marked with syntax highlighting for code blocks
-        this.marked.setOptions({
+        // Configure marked with modern API
+        this.marked.use({
             highlight: (code, lang) => {
                 if (this.hljs && lang && this.hljs.getLanguage(lang)) {
                     try {
@@ -37,32 +37,20 @@ class MarkdownRenderer {
             },
             breaks: true,
             gfm: true,
-            headerIds: true,
-            mangle: false,
-            sanitize: false, // We'll handle sanitization manually
-            smartLists: true,
-            smartypants: true
+            renderer: {
+                code: (code, language) => {
+                    const validLang = this.hljs && language && this.hljs.getLanguage(language) ? language : 'text';
+                    const highlighted = this.hljs && validLang !== 'text' ? 
+                        this.hljs.highlight(code, { language: validLang }).value : 
+                        this.escapeHtml(code);
+                    
+                    return `<pre><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
+                },
+                codespan: (code) => {
+                    return `<code class="inline-code">${this.escapeHtml(code)}</code>`;
+                }
+            }
         });
-        
-        // Set up custom renderer for better code blocks
-        const renderer = new this.marked.Renderer();
-        
-        // Custom code block renderer
-        renderer.code = (code, language) => {
-            const validLang = this.hljs && language && this.hljs.getLanguage(language) ? language : 'text';
-            const highlighted = this.hljs && validLang !== 'text' ? 
-                this.hljs.highlight(code, { language: validLang }).value : 
-                this.escapeHtml(code);
-            
-            return `<pre><code class="hljs language-${validLang}">${highlighted}</code></pre>`;
-        };
-        
-        // Custom inline code renderer
-        renderer.codespan = (code) => {
-            return `<code class="inline-code">${this.escapeHtml(code)}</code>`;
-        };
-        
-        this.marked.setOptions({ renderer });
     }
     
     /**

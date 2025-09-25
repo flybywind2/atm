@@ -669,23 +669,19 @@ class LLMAgentService:
     ) -> str:
         """Generate requirements document"""
         system_prompt = self.templates.get_system_prompt(AgentType.REQUIREMENTS_GENERATOR)
-        
+        title = problem_analysis.get("title", "소프트웨어 솔루션")
         user_prompt = f"""
-Problem Analysis: {json.dumps(problem_analysis, indent=2)}
+문제 분석(Problem Analysis): {json.dumps(problem_analysis, indent=2, ensure_ascii=False)}
 
-Context Information: {json.dumps(context, indent=2)}
+맥락 정보(Context Information): {json.dumps(context, indent=2, ensure_ascii=False)}
 
-Generate a comprehensive Software Requirements Specification (SRS) document in Markdown format.
-Include:
-1. Executive Summary
-2. Functional Requirements
-3. Non-Functional Requirements
-4. User Stories
-5. Acceptance Criteria
-6. System Constraints
-7. Integration Requirements
+아래 지침에 따라 한국어(ko-KR)로 완전한 소프트웨어 요구사항 명세서(SRS)를 마크다운으로 작성하세요.
+- H1 제목은 반드시 다음을 그대로 사용: "소프트웨어 요구사항 명세서 (SRS) - {title}"
+- 기능/비기능 요구사항은 테스트 가능한 수용 기준을 포함
+- 사용자 스토리(As a, I want, so that)를 한국어로 자연스럽게 재작성
+- 통합/제약/보안/성능 요구사항 포함
 """
-        
+
         return await self.llm_manager.simple_completion(
             user_prompt,
             system_prompt,
@@ -757,7 +753,8 @@ Solution Design: {json.dumps(solution_design, indent=2)}
 Requirements Document:
 {requirements}
 
-Create a comprehensive implementation guide in Markdown format including:
+Create a comprehensive implementation guide in Markdown format. Write the entire output in Korean (ko-KR).
+Include the following sections:
 1. Project Setup and Environment
 2. Work Breakdown Structure (WBS)
 3. Code Examples and Best Practices

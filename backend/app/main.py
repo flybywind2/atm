@@ -16,15 +16,22 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
+# Import configuration
+from app.config import settings
+
 # Import API routers
 from app.api.analysis import analysis_router
 from app.models.responses import ErrorResponse
 from app.database.checkpointer import get_checkpointer_manager
 
 # Configure logging
+import sys
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -114,16 +121,14 @@ async def general_exception_handler(request: Request, exc: Exception):
 # Configure CORS for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact frontend origin
-    allow_credentials=True,
+    allow_origins=settings.CORS_ALLOWED_ORIGINS,
+    allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount static files for frontend (assuming frontend is in ../frontend)
-frontend_path = Path(__file__).parent.parent.parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
+# Include API routers first (higher priority)
+app.include_router(analysis_router, prefix="/api/v1", tags=["analysis"])
 
 # Health check endpoint
 @app.get("/api/health")
@@ -184,15 +189,17 @@ async def api_root():
     }
 
 
-# Include API routers
-app.include_router(analysis_router, prefix="/api/v1", tags=["analysis"])
+# Mount static files for frontend (after API routes)
+frontend_path = settings.get_frontend_path()
+if frontend_path.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="frontend")
 
 if __name__ == "__main__":
     # Development server configuration
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-        log_level="info"
+        host=settings.SERVER_HOST,
+        port=settings.SERVER_PORT,
+        reload=settings.RELOAD_MODE,
+        log_level=settings.LOG_LEVEL
     )

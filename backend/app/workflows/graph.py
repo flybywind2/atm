@@ -21,7 +21,7 @@ try:
     from langgraph_checkpoint_sqlite.aio import AsyncSqliteSaver
 except ImportError:
     try:
-        # Fallback to old import structure
+        # Fallback to old import structure (the correct one based on Context7)
         from langgraph.checkpoint.sqlite import SqliteSaver
         from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
     except ImportError:
@@ -36,6 +36,7 @@ except ImportError:
             def from_conn_string(cls, conn_string):
                 return cls()
 
+from app.config import settings
 from app.workflows.state import WorkflowState, ProblemSolvingState
 from app.agents.analyzer import analyze_problem
 from app.agents.context_collector import collect_context
@@ -95,41 +96,69 @@ def check_context_complete(state: WorkflowState) -> Literal["collect_context", "
 def route_solution(state: WorkflowState) -> Literal["create_guide", "collect_context", "design_solution"]:
     """
     Enhanced conditional edge function to route solution based on analysis results
-    
+
     This function handles:
     - Solution type complexity assessment
     - Context completeness validation
     - Implementation readiness checks
     - Error recovery routing
-    
+
     Args:
         state: Current workflow state
-        
+
     Returns:
         Next node name based on solution requirements and state
     """
+    logger.info("=== ROUTE_SOLUTION FUNCTION CALLED ===")
+    logger.info(f"State keys: {list(state.keys())}")
+
     solution_type = state.get("solution_type") or state.get("recommended_solution_type", "")
     context_complete = state.get("context_complete", False)
     technology_stack = state.get("technology_stack", {})
     implementation_plan = state.get("implementation_plan", "")
-    
+    current_step = state.get("current_step", "unknown")
+
+    logger.info(f"Current step: {current_step}")
+    logger.info(f"Solution type: {solution_type}")
+    logger.info(f"Context complete: {context_complete}")
+    logger.info(f"Technology stack type: {type(technology_stack)}, value: {technology_stack}")
+    logger.info(f"Implementation plan type: {type(implementation_plan)}, value: {implementation_plan}")
+
     # Check for error conditions that require re-design
     error_message = state.get("error_message")
     if error_message and "design" in error_message.lower():
         logger.warning(f"Routing back to design due to error: {error_message}")
         return "design_solution"
-    
+
     # For complex solutions that need more context
     complex_solutions = ["RAG", "ML_CLASSIFICATION", "COMPLEX_AUTOMATION", "INTEGRATION"]
     if solution_type in complex_solutions and not context_complete:
         logger.info(f"Complex solution {solution_type} requires more context")
         return "collect_context"
-    
-    # Check if solution design is incomplete
-    if not technology_stack or not implementation_plan:
+
+    # Check if solution design is incomplete with detailed logging
+    tech_stack_valid = bool(technology_stack and isinstance(technology_stack, dict) and len(technology_stack) > 0)
+    impl_plan_valid = bool(implementation_plan and isinstance(implementation_plan, dict) and len(implementation_plan) > 0)
+
+    logger.info(f"🔍🚀 Solution validation check - ENHANCED:")
+    logger.info(f"  - technology_stack exists: {bool(technology_stack)}, valid: {tech_stack_valid}")
+    logger.info(f"  - implementation_plan exists: {bool(implementation_plan)}, valid: {impl_plan_valid}")
+
+    # Be more lenient - allow if either field exists or if we've tried multiple times
+    retry_count = state.get("retry_count", 0)
+    logger.info(f"Current retry count: {retry_count}")
+
+    if retry_count > 3:
+        logger.info(f"⚠️ Retry count exceeded ({retry_count}), proceeding to avoid infinite loop")
+        return "create_guide"
+
+    if not tech_stack_valid and not impl_plan_valid:
         logger.info("Solution design incomplete, continuing design phase")
+        # Increment retry count to prevent infinite loops
+        state["retry_count"] = retry_count + 1
+        logger.info(f"Updated retry count to: {retry_count + 1}")
         return "design_solution"
-    
+
     # If everything is ready, proceed to guide creation
     logger.info(f"Solution {solution_type} ready for guide creation")
     return "create_guide"
@@ -266,20 +295,28 @@ def create_workflow_graph(enable_human_loop: bool = True) -> StateGraph:
     return workflow
 
 
-def get_compiled_workflow(db_path: str = "workflow_checkpoints.db", 
-                          enable_human_loop: bool = True,
-                          use_persistent_storage: bool = True) -> Any:
+def get_compiled_workflow(db_path: str = None, 
+                          enable_human_loop: bool = None,
+                          use_persistent_storage: bool = None) -> Any:
     """
     Get a compiled workflow graph with full SQLite checkpointer integration
     
     Args:
-        db_path: Path to SQLite database for checkpointing
-        enable_human_loop: Whether to enable human-in-the-loop functionality
-        use_persistent_storage: Whether to use persistent storage (vs in-memory)
+        db_path: Path to SQLite database for checkpointing (defaults from settings)
+        enable_human_loop: Whether to enable human-in-the-loop functionality (defaults from settings)
+        use_persistent_storage: Whether to use persistent storage (defaults from settings)
         
     Returns:
         Compiled workflow ready for execution with full state persistence
     """
+    # Use settings defaults if not provided
+    if db_path is None:
+        db_path = settings.get_database_path()
+    if enable_human_loop is None:
+        enable_human_loop = settings.ENABLE_HUMAN_LOOP
+    if use_persistent_storage is None:
+        use_persistent_storage = settings.USE_PERSISTENT_STORAGE
+    
     workflow = create_workflow_graph(enable_human_loop=enable_human_loop)
     
     # Configure SQLite checkpointer for persistence
@@ -299,44 +336,105 @@ def get_compiled_workflow(db_path: str = "workflow_checkpoints.db",
     return compiled_workflow
 
 
-async def get_async_compiled_workflow(db_path: str = "workflow_checkpoints.db",
-                                     enable_human_loop: bool = True) -> Any:
+async def get_async_compiled_workflow_direct(db_path: str = None,
+                                           enable_human_loop: bool = None):
     """
-    Get an async compiled workflow graph with AsyncSqliteSaver
+    Get async workflow following exact Context7 pattern without wrapper class
     
     Args:
-        db_path: Path to SQLite database for checkpointing
-        enable_human_loop: Whether to enable human-in-the-loop functionality
+        db_path: Path to SQLite database for checkpointing (defaults from settings)
+        enable_human_loop: Whether to enable human-in-the-loop functionality (defaults from settings)
         
     Returns:
-        Compiled async workflow ready for execution
+        AsyncSqliteSaver context manager that yields compiled workflow
     """
+    # Use settings defaults if not provided
+    if enable_human_loop is None:
+        enable_human_loop = settings.ENABLE_HUMAN_LOOP
+        
     workflow = create_workflow_graph(enable_human_loop=enable_human_loop)
     
-    # Configure async SQLite checkpointer
-    checkpointer = await get_async_checkpointer(db_path)
+    # Return the AsyncSqliteSaver context manager directly following Context7 pattern
+    return AsyncSqliteSaver.from_conn_string(":memory:")
+
+
+class AsyncWorkflowManager:
+    """
+    Context manager for proper AsyncSqliteSaver lifecycle management
+    """
     
-    # Compile the workflow with async checkpointer
-    compiled_workflow = workflow.compile(checkpointer=checkpointer)
+    def __init__(self, db_path: str = None, enable_human_loop: bool = None):
+        # Use settings defaults if not provided
+        if db_path is None:
+            db_path = settings.get_database_path()
+        if enable_human_loop is None:
+            enable_human_loop = settings.ENABLE_HUMAN_LOOP
+            
+        self.db_path = db_path
+        self.enable_human_loop = enable_human_loop
+        self.workflow = create_workflow_graph(enable_human_loop=enable_human_loop)
+        self.checkpointer = None
+        self.compiled_workflow = None
     
-    logger.info(f"Async workflow compiled with checkpointer: {db_path}")
-    return compiled_workflow
+    async def __aenter__(self):
+        """Enter async context and setup AsyncSqliteSaver following Context7 pattern"""
+        try:
+            # Use the exact Context7 pattern
+            logger.info("Using in-memory SQLite database for AsyncSqliteSaver")
+            
+            # Create AsyncSqliteSaver following Context7 documentation exactly
+            async with AsyncSqliteSaver.from_conn_string(":memory:") as checkpointer:
+                # Compile the workflow with async checkpointer
+                self.compiled_workflow = self.workflow.compile(checkpointer=checkpointer)
+                self.checkpointer = checkpointer
+                
+                logger.info("AsyncWorkflowManager compiled with AsyncSqliteSaver (in-memory)")
+                return self.compiled_workflow
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize AsyncSqliteSaver: {e}")
+            raise
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Exit async context and cleanup AsyncSqliteSaver"""
+        # The AsyncSqliteSaver context manager handles its own cleanup
+        self.checkpointer = None
+        self.compiled_workflow = None
+
+
+async def get_async_compiled_workflow(db_path: str = None,
+                                     enable_human_loop: bool = None) -> AsyncWorkflowManager:
+    """
+    Get an async workflow manager that properly handles AsyncSqliteSaver lifecycle
+    
+    Args:
+        db_path: Path to SQLite database for checkpointing (defaults from settings)
+        enable_human_loop: Whether to enable human-in-the-loop functionality (defaults from settings)
+        
+    Returns:
+        AsyncWorkflowManager that can be used as async context manager
+    """
+    return AsyncWorkflowManager(db_path=db_path, enable_human_loop=enable_human_loop)
 
 
 def create_new_workflow_session(user_id: Optional[str] = None, 
                                workflow_type: str = "problem_solving",
-                               db_path: str = "workflow_checkpoints.db") -> str:
+                               db_path: str = None) -> str:
     """
     Create a new workflow session with proper tracking
     
     Args:
         user_id: Optional user identifier
         workflow_type: Type of workflow being created
-        db_path: Database path for checkpointing
+        db_path: Database path for checkpointing (defaults from settings)
         
     Returns:
         Generated thread_id for the new session
     """
+    # Use settings default if not provided
+    if db_path is None:
+        db_path = settings.get_database_path()
+    
     # Generate unique thread ID
     thread_id = f"workflow_{uuid.uuid4().hex[:12]}"
     

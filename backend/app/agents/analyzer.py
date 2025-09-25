@@ -33,6 +33,11 @@ async def analyze_problem(state: WorkflowState) -> WorkflowState:
         Updated state with structured problem analysis
     """
     try:
+        # Force debug output to file
+        with open("debug_workflow.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== ANALYZER CALLED at {datetime.now()} ===\n")
+            f.write(f"State keys: {list(state.keys())}\n")
+
         logger.info("Starting problem analysis")
         
         problem_description = state["problem_description"]
@@ -88,8 +93,9 @@ async def analyze_problem(state: WorkflowState) -> WorkflowState:
         return updated_state
         
     except Exception as e:
-        logger.error(f"Error in problem analysis: {str(e)}")
-        return handle_analysis_error(state, str(e))
+        logger.error(f"Error in problem analysis - NO FALLBACK: {str(e)}")
+        # 바로 예외를 발생시켜 문제를 즉시 알림
+        raise ValueError(f"Problem analysis failed: {e}")
 
 
 async def create_structured_analysis(problem_description: str, context_data: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -133,8 +139,9 @@ async def create_structured_analysis(problem_description: str, context_data: Dic
         return analysis
         
     except Exception as e:
-        logger.error(f"Error in LLM analysis: {str(e)}")
-        return create_fallback_analysis(problem_description)
+        logger.error(f"Error in LLM analysis - NO FALLBACK: {str(e)}")
+        # 바로 예외를 발생시켜 문제를 즉시 알림
+        raise ValueError(f"LLM analysis failed: {e}")
 
 
 def create_enhanced_analysis_prompt(problem_description: str, enhanced_context: Dict[str, Any]) -> str:
@@ -194,9 +201,10 @@ def validate_analysis_response(analysis: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Validated and sanitized analysis
     """
-    # Valid categories
+    # Valid categories (including ML subcategories)
     valid_categories = {
-        "AUTOMATION", "INFORMATION_RETRIEVAL", "MACHINE_LEARNING", 
+        "AUTOMATION", "INFORMATION_RETRIEVAL", "MACHINE_LEARNING",
+        "ML_CLASSIFICATION", "ML_REGRESSION", "ML_CLUSTERING", "ML_RECOMMENDATION",
         "DATA_VISUALIZATION", "INTEGRATION", "GENERAL_PROBLEM_SOLVING"
     }
     
@@ -300,34 +308,64 @@ def create_fallback_analysis(problem_description: str) -> Dict[str, Any]:
 def categorize_problem_keywords(problem_description: str) -> str:
     """
     Categorize problem based on keywords (fallback method).
-    
+
     Args:
         problem_description: User's problem description
-        
+
     Returns:
         Problem category string
     """
     description_lower = problem_description.lower()
-    
-    # Keyword mapping for categories
-    category_keywords = {
-        "AUTOMATION": ["automate", "script", "repetitive", "manual", "schedule", "batch"],
-        "INFORMATION_RETRIEVAL": ["search", "find", "document", "knowledge", "retrieve", "query"],
-        "MACHINE_LEARNING": ["predict", "classify", "model", "pattern", "learn", "training"],
-        "DATA_VISUALIZATION": ["chart", "graph", "dashboard", "report", "visualize", "plot"],
-        "INTEGRATION": ["api", "connect", "integrate", "sync", "import", "export"]
-    }
-    
-    # Count keyword matches
-    category_scores = {}
-    for category, keywords in category_keywords.items():
-        score = sum(1 for keyword in keywords if keyword in description_lower)
-        if score > 0:
-            category_scores[category] = score
-    
-    # Return highest scoring category or default
-    if category_scores:
-        return max(category_scores, key=category_scores.get)
+
+    # Priority-based keyword categorization
+    # INTEGRATION keywords (highest priority)
+    integration_keywords = [
+        "시스템 통합", "system integration", "연동", "api", "통합", "integrate", "connect",
+        "sync", "synchronization", "동기화", "crm", "erp", "warehouse", "order management",
+        "주문 관리", "창고 관리", "재고", "inventory", "dashboard", "대시보드", "reporting",
+        "보고서", "자동화된 보고", "automated reporting"
+    ]
+
+    # Specific ML keywords (excluding generic terms)
+    specific_ml_keywords = [
+        # Environmental/Industrial specific
+        "폐수", "수질", "오염", "환경", "농도", "수치", "측정", "품질",
+        "wastewater", "water", "quality", "pollution", "environmental", "concentration",
+        "measurement", "anomaly detection", "outlier", "treatment", "처리",
+        # ML specific terms
+        "예측", "분류", "모델", "머신러닝", "기계학습", "알고리즘", "신경망", "회귀", "이상치", "원인", "파악",
+        "predict", "classify", "model", "ml", "machine learning", "neural", "algorithm", "regression"
+    ]
+
+    # Other category keywords
+    automation_keywords = ["automate", "script", "repetitive", "manual", "schedule", "batch", "자동화", "스크립트", "반복", "수동", "일정", "배치"]
+    ir_keywords = ["search", "find", "document", "knowledge", "retrieve", "query", "검색", "찾기", "문서", "지식", "조회", "쿼리"]
+    viz_keywords = ["chart", "graph", "visualize", "plot", "차트", "그래프", "시각화", "플롯"]
+
+    # Count keyword matches with priority
+    integration_count = sum(1 for keyword in integration_keywords if keyword in description_lower)
+    ml_count = sum(1 for keyword in specific_ml_keywords if keyword in description_lower)
+
+    # Priority 1: INTEGRATION
+    if integration_count >= 2:
+        return "INTEGRATION"
+
+    # Priority 2: ML categories (only if no integration context)
+    if ml_count >= 2 and integration_count == 0:
+        if any(word in description_lower for word in ["예측", "predict", "회귀", "regression", "수치", "농도", "concentration"]):
+            return "ML_REGRESSION"
+        elif any(word in description_lower for word in ["분류", "classify", "classification", "이상", "anomaly", "탐지", "detection"]):
+            return "ML_CLASSIFICATION"
+        else:
+            return "MACHINE_LEARNING"
+
+    # Priority 3: Other categories
+    if any(keyword in description_lower for keyword in viz_keywords):
+        return "DATA_VISUALIZATION"
+    elif any(keyword in description_lower for keyword in ir_keywords):
+        return "INFORMATION_RETRIEVAL"
+    elif any(keyword in description_lower for keyword in automation_keywords):
+        return "AUTOMATION"
     else:
         return "GENERAL_PROBLEM_SOLVING"
 

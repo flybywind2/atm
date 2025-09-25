@@ -47,3 +47,23 @@ class ResumeRequest(BaseModel):
         default=None,
         description="Structured data collected during context collection phase"
     )
+
+
+class ProblemSolvingRequest(BaseModel):
+    """
+    Request model for starting problem solving workflow
+    
+    Attributes:
+        problem_description: Detailed description of the problem
+        context_data: Optional additional context
+    """
+    problem_description: str = Field(
+        ...,
+        description="Detailed description of the problem to solve",
+        min_length=10,
+        max_length=5000
+    )
+    context_data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Additional context about the problem or requirements"
+    )

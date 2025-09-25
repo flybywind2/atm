@@ -53,6 +53,12 @@ body {
     border: 1px solid var(--border-color);
     margin-bottom: 2rem;
     transition: var(--transition);
+    padding: 2rem;
+}
+
+/* Show problem input by default */
+#problem-input-container {
+    display: block;
 }
 
 #problem-input-container.active,
@@ -261,6 +267,9 @@ textarea.form-control {
     border-bottom: 2px solid transparent;
     transition: all 0.2s ease-in-out;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    position: relative;
 }
 
 .tab-button.active {
@@ -273,6 +282,30 @@ textarea.form-control {
     background-color: rgba(37, 99, 235, 0.05);
 }
 
+/* Real-time tab status indicators */
+.tab-button.available {
+    color: var(--success-color);
+}
+
+.tab-button.pending {
+    color: var(--text-secondary);
+    opacity: 0.6;
+}
+
+.tab-button.generating {
+    color: var(--warning-color);
+}
+
+.tab-button .status-indicator {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
 .document-content {
     max-height: 600px;
     overflow-y: auto;
@@ -280,6 +313,7 @@ textarea.form-control {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius);
     background-color: var(--background-color);
+
 }
 
 .document-actions {
@@ -292,6 +326,7 @@ textarea.form-control {
 /* Markdown content styling */
 .markdown-content {
     line-height: 1.7;
+    color:black;
 }
 
 .markdown-content h1,
@@ -344,7 +379,7 @@ textarea.form-control {
 
 .markdown-content pre {
     background-color: #1e293b;
-    color: #e2e8f0;
+    color: black;
     padding: 1rem;
     border-radius: var(--border-radius);
     overflow-x: auto;
@@ -861,6 +896,31 @@ textarea.form-control {
 .status-indicator.paused {
     background-color: rgba(245, 158, 11, 0.1);
     color: var(--warning-color);
+}
+
+/* 애니메이션 효과 - 움직이는 아이콘 */
+.spinning {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.status-indicator.processing .status-icon {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.step-status.spinning {
+    display: inline-block;
+    animation: spin 1.5s linear infinite;
 }
 
 /* Document Viewer Component specific styles */
