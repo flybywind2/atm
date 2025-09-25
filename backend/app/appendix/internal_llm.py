@@ -604,7 +604,21 @@ class LLMAgentService:
         )
 
         try:
-            parsed = json.loads(response)
+            # Normalize fenced code blocks and extract JSON array
+            resp = response.strip()
+            if resp.startswith('```json'):
+                resp = resp[7:]
+            elif resp.startswith('```'):
+                resp = resp[3:]
+            if resp.endswith('```'):
+                resp = resp[:-3]
+            resp = resp.strip()
+            # Extract JSON array if surrounded by text
+            start = resp.find('[')
+            end = resp.rfind(']')
+            if start != -1 and end != -1 and end > start:
+                resp = resp[start:end+1]
+            parsed = json.loads(resp)
             if isinstance(parsed, list):
                 return [str(q).strip() for q in parsed if q]
         except json.JSONDecodeError:
