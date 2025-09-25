@@ -352,29 +352,52 @@ class LLMManager:
         self._initialize_clients()
     
     def _load_config_from_env(self) -> LLMConfig:
-        """Load configuration from environment variables"""
-        env = os.getenv("ENVIRONMENT", "development")
-        
-        # Environment-based configuration
-        if env == "production":
+        """환경 변수/애플리케이션 설정에서 LLM 구성 로드"""
+        try:
+            from app.config import settings as app_settings
+        except Exception:
+            app_settings = None
+
+        # 기본값(개발 환경: Ollama)
+        provider = LLMProvider.OLLAMA
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        api_key = "dummy-key"
+        model = os.getenv("OLLAMA_MODEL", "llama3.1")
+        custom_headers: Dict[str, str] = {}
+
+        # 서비스 타입 결정
+        service_type = os.getenv("LLM_SERVICE_TYPE")
+        if app_settings and not service_type:
+            try:
+                service_type = app_settings.LLM_SERVICE_TYPE
+            except Exception:
+                service_type = None
+        service_type = (service_type or "ollama").lower()
+
+        if service_type == "external":
+            provider = LLMProvider.OPENAI
+            base_url = (app_settings.EXTERNAL_LLM_API_URL if app_settings else os.getenv("EXTERNAL_LLM_API_URL", "https://api.openai.com/v1"))
+            api_key = (app_settings.EXTERNAL_LLM_API_KEY if app_settings else os.getenv("EXTERNAL_LLM_API_KEY", ""))
+            model = (app_settings.EXTERNAL_LLM_MODEL if app_settings else os.getenv("EXTERNAL_LLM_MODEL", "gpt-4o-mini"))
+            custom_headers = {"Authorization": f"Bearer {api_key}"}
+        elif service_type == "internal":
             provider = LLMProvider.INTERNAL
-            base_url = os.getenv("INTERNAL_LLM_BASE_URL", "https://internal-api.company.com")
-            api_key = os.getenv("INTERNAL_LLM_API_KEY", "")
-            model = os.getenv("INTERNAL_LLM_MODEL", "gpt-4")
+            base_url = (app_settings.INTERNAL_LLM_API_URL if app_settings else os.getenv("INTERNAL_LLM_API_URL", "http://localhost:11434/v1"))
+            api_key = (app_settings.INTERNAL_LLM_API_KEY if app_settings else os.getenv("INTERNAL_LLM_API_KEY", ""))
+            model = (app_settings.INTERNAL_LLM_MODEL if app_settings else os.getenv("INTERNAL_LLM_MODEL", "gpt-4"))
             custom_headers = {
-                "x-dep-ticket": os.getenv("INTERNAL_LLM_TICKET", ""),
+                "x-dep-ticket": os.getenv("INTERNAL_LLM_TICKET", "default-ticket"),
                 "Send-System-Name": "ATM-System",
                 "User-ID": os.getenv("USER_ID", "system"),
                 "User-Type": "AD"
             }
         else:
-            # Development/testing environment
             provider = LLMProvider.OLLAMA
-            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            base_url = (app_settings.OLLAMA_BASE_URL if app_settings else os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"))
             api_key = "dummy-key"
-            model = os.getenv("OLLAMA_MODEL", "llama3.1")
+            model = (app_settings.OLLAMA_MODEL if app_settings else os.getenv("OLLAMA_MODEL", "llama3.1"))
             custom_headers = {}
-        
+
         return LLMConfig(
             provider=provider,
             base_url=base_url,
@@ -393,6 +416,13 @@ class LLMManager:
             self.client = InternalLLMClient(self.config)
         elif self.config.provider == LLMProvider.OLLAMA:
             self.client = OllamaLLMClient(self.config)
+        elif self.config.provider == LLMProvider.OPENAI:
+            # 외부 LLM: 루트 appendix/internal_llm.py의 llm 어댑터를 사용 시도
+            try:
+                self.client = ExternalAdapterClient(self.config)
+            except Exception as e:
+                logger.warning(f"External adapter load failed: {e}; falling back to InternalLLMClient against external API")
+                self.client = InternalLLMClient(self.config)
         
         # Setup fallback clients
         self._setup_fallback_clients()
@@ -407,23 +437,28 @@ class LLMManager:
                 model="llama3.1"
             )
             self.fallback_clients.append(OllamaLLMClient(ollama_config))
-    
+
     async def chat_completion(
         self,
         messages: List[Dict[str, str]],
         **kwargs
     ) -> LLMResponse:
-        """Generate chat completion with fallback support"""
+        """LLM 응답 생성(기본 + 폴백 지원)
+
+        1) 기본 클라이언트 호출 실패 시 경고 로깅 후
+        2) 폴백 클라이언트 순차 시도
+        모두 실패하면 마지막 오류로 예외 발생
+        """
         last_error = None
-        
-        # Try primary client
+
+        # 1) 기본 클라이언트 시도
         try:
             return await self.client.chat_completion(messages, **kwargs)
         except Exception as e:
             logger.warning(f"Primary LLM client failed: {e}")
             last_error = e
-        
-        # Try fallback clients
+
+        # 2) 폴백 클라이언트 시도
         for fallback_client in self.fallback_clients:
             try:
                 logger.info(f"Trying fallback client: {fallback_client.__class__.__name__}")
@@ -431,34 +466,89 @@ class LLMManager:
             except Exception as e:
                 logger.warning(f"Fallback client failed: {e}")
                 last_error = e
-        
-        # All clients failed
+
+        # 3) 모두 실패
         raise Exception(f"All LLM clients failed. Last error: {last_error}")
-    
+
     async def simple_completion(
         self,
         prompt: str,
         system_message: Optional[str] = None,
         **kwargs
     ) -> str:
-        """Simple completion interface for single prompts"""
-        messages = []
-        
+        """단일 프롬프트 간편 호출(시스템 메시지 포함 가능)"""
+        messages: List[Dict[str, str]] = []
         if system_message:
             messages.append({"role": "system", "content": system_message})
-        
         messages.append({"role": "user", "content": prompt})
-        
         response = await self.chat_completion(messages, **kwargs)
         return response.content
-    
+
     async def close(self):
-        """Close all clients"""
+        """모든 클라이언트 종료"""
         if self.client:
             await self.client.close()
-        
         for fallback_client in self.fallback_clients:
             await fallback_client.close()
+
+class ExternalAdapterClient(BaseLLMClient):
+    """외부 LLM 어댑터 클라이언트
+
+    - 루트 모듈 `appendix.internal_llm`의 `llm` 객체(ChatOpenAI 등)를 재사용합니다.
+    - 모듈 임포트 시 콘솔 출력이 발생할 수 있어, 임포트 시 표준출력을 일시적으로 차단합니다.
+    """
+
+    def __init__(self, config: LLMConfig):
+        super().__init__(config)
+        self.adapter = None
+        self._import_adapter()
+
+    def _import_adapter(self):
+        import importlib
+        import sys
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from pathlib import Path
+
+        # repo 루트를 sys.path에 추가하여 'appendix' 패키지 임포트 보장
+        try:
+            repo_root = Path(__file__).resolve().parents[3]
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
+        except Exception:
+            pass
+
+        buf = StringIO()
+        with redirect_stdout(buf):
+            module = importlib.import_module("appendix.internal_llm")
+        adapter = getattr(module, "llm", None)
+        if adapter is None:
+            raise ImportError("appendix.internal_llm 모듈에 'llm' 인스턴스가 없습니다.")
+        self.adapter = adapter
+
+    @retry_on_failure()
+    async def chat_completion(self, messages: List[Dict[str, str]], **kwargs) -> LLMResponse:
+        # messages를 단일 프롬프트로 단순 결합
+        prompt = "\n\n".join(f"[{m['role']}] {m['content']}" for m in messages)
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            # 어댑터는 동기일 수 있으므로 스레드 풀에서 실행 + 타임아웃 적용
+            timeout = kwargs.get("timeout") or self.config.timeout or 60
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.adapter.invoke(prompt)),
+                timeout=timeout
+            )
+            content = getattr(result, "content", None) or str(result)
+            return LLMResponse(content=content, model=self.config.model)
+        except Exception as e:
+            raise Exception(f"External adapter 호출 실패: {e}")
+
+    async def stream_completion(self, messages: List[Dict[str, str]], **kwargs):
+        # 간단 구현: 스트리밍 미지원 → 전체 반환
+        resp = await self.chat_completion(messages, **kwargs)
+        yield resp.content
+
 
 
 class AgentPromptTemplates:

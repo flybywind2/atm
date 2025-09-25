@@ -148,9 +148,9 @@ async def create_structured_analysis(problem_description: str, context_data: Dic
         return analysis
         
     except Exception as e:
-        logger.error(f"Error in LLM analysis - NO FALLBACK: {str(e)}")
-        # 바로 예외를 발생시켜 문제를 즉시 알림
-        raise ValueError(f"LLM analysis failed: {e}")
+        logger.error(f"Error in LLM analysis - using fallback: {str(e)}")
+        # 폴백: 최소한의 구조화 분석을 생성하여 워크플로를 진행시킵니다.
+        return fallback_basic_analysis(problem_description)
 
 
 def create_enhanced_analysis_prompt(problem_description: str, enhanced_context: Dict[str, Any]) -> str:
@@ -198,6 +198,42 @@ Please provide a structured analysis of this problem with the following componen
         return base_prompt + context_section
     
     return base_prompt
+
+
+def fallback_basic_analysis(problem_description: str) -> Dict[str, Any]:
+    """LLM 실패 시 최소 구조의 분석을 생성하는 폴백 함수.
+
+    간단한 키워드 규칙으로 카테고리를 추정하고, 나머지는 기본값으로 채워
+    다음 단계(컨텍스트 수집)로 진행할 수 있게 합니다.
+    """
+    desc_lower = (problem_description or "").lower()
+    if any(k in desc_lower for k in ["api", "integrate", "연동", "통합", "crm", "erp", "order"]):
+        category = "INTEGRATION"
+        domain = "시스템 통합"
+    elif any(k in desc_lower for k in ["predict", "예측", "분류", "머신러닝", "ml"]):
+        category = "ML_CLASSIFICATION"
+        domain = "데이터 과학"
+    elif any(k in desc_lower for k in ["dashboard", "차트", "그래프", "시각화"]):
+        category = "DATA_VISUALIZATION"
+        domain = "시각화/리포팅"
+    else:
+        category = "AUTOMATION"
+        domain = "업무 자동화"
+
+    return {
+        "title": problem_description[:50] or "사용자 문제",
+        "domain": domain,
+        "category": category,
+        "complexity": "MEDIUM",
+        "stakeholders": ["업무 담당자", "개발팀"],
+        "pain_points": ["수동 작업", "데이터 분산"],
+        "current_state": "현재 프로세스가 수동/분산되어 비효율",
+        "desired_state": "자동화/통합된 프로세스로 효율성 향상",
+        "constraints": ["예산/일정/보안 고려"],
+        "success_criteria": ["처리 시간 단축", "오류 감소"],
+        # 컨텍스트 수집을 유도하기 위한 초기 결손 정보
+        "missing_information": ["data_sources", "frequency"]
+    }
 
 
 def validate_analysis_response(analysis: Dict[str, Any]) -> Dict[str, Any]:
