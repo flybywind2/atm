@@ -1,8 +1,9 @@
 /**
- * Document Viewer Component
- * 
- * This component displays the generated analysis results including requirements document,
- * user journey map, implementation guide, and technical recommendations.
+ * 문서 뷰어 컴포넌트 (비개발자용 안내)
+ *
+ * 생성된 문서(요구사항, 사용자 여정, 구현 가이드, 기술 추천서)를 탭으로 보여줍니다.
+ * - 미리보기/복사/인쇄/다운로드/전체 다운로드 기능을 제공합니다.
+ * - 진행 중에는 상단 박스가 단계별 상태(분석/수집/생성 중)를 안내합니다.
  */
 
 class DocumentViewerComponent {

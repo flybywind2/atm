@@ -1,8 +1,9 @@
 """
-RAG Service Interface for RAGaaS Portal Integration (Backend App Version)
+RAG 서비스 인터페이스 (백엔드 앱용 래퍼)
 
-This module provides the RAG service interface for the backend application,
-importing from the main appendix implementation while providing backward compatibility.
+비개발자 요약:
+- 메인 RAG 구현(appendix/rag_retrieve.py)을 불러와 백엔드 앱에서 쉽게 사용하도록
+  래핑합니다. 메인 모듈이 없을 때를 대비한 폴백 구현도 포함합니다.
 """
 
 # Import the main RAG implementation

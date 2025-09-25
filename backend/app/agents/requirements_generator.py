@@ -1,9 +1,10 @@
 """
-Requirements Generation Agent
+요구사항 생성 에이전트(Requirements Generator)
 
-This agent generates comprehensive Software Requirements Specification (SRS)
-documents based on the analyzed problem and collected context using LLM integration.
-Implements the generate_requirements node for the LangGraph workflow.
+비개발자 요약:
+- 분석/컨텍스트를 바탕으로 SRS(요구사항 명세서)를 생성합니다.
+- 기능/비기능 요구사항, 사용자 스토리, 승인 기준 등을 포함합니다.
+- LangGraph의 generate_requirements 단계에 해당합니다.
 """
 
 import json
@@ -21,17 +22,20 @@ logger = logging.getLogger(__name__)
 
 async def generate_requirements(state: WorkflowState) -> WorkflowState:
     """
-    Generate comprehensive requirements documentation using LLM integration.
+    분석/컨텍스트를 바탕으로 포괄적인 SRS(요구사항 명세서)를 생성합니다.
 
-    Creates functional and non-functional requirements, user stories,
-    and acceptance criteria based on problem analysis and context.
-    Generates both structured data and markdown SRS document.
+    매개변수:
+        state: 현재 워크플로 상태(필요: problem_analysis, context_data 등)
 
-    Args:
-        state: Current workflow state
+    반환:
+        SRS 문서와 여정 지도 등이 포함된 갱신 상태
 
-    Returns:
-        Updated state with generated requirements
+    예시(반환 주요 키):
+        {
+          "current_step": "requirements_generated",
+          "requirements_document": "# 소프트웨어 요구사항 명세서 ...",
+          "user_journey_map": "# 사용자 여정 지도 ..."
+        }
     """
     try:
         # Force debug output to file

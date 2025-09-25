@@ -1,8 +1,9 @@
 """
-AI-based Problem Solving Copilot System - FastAPI Application Entry Point
+AI 문제 해결 코파일럿 - FastAPI 진입점
 
-This module initializes the FastAPI application with CORS configuration,
-error handling, and sets up the API routes for the problem-solving workflow.
+비개발자 요약:
+- 이 파일은 웹 서버의 시작점입니다. CORS(보안 설정), 오류 처리,
+  API 라우터 연결(분석 시작/상태/재개), 정적 파일(프런트) 제공을 설정합니다.
 """
 
 from fastapi import FastAPI, HTTPException, Request

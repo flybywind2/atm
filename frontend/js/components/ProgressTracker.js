@@ -1,8 +1,9 @@
 /**
- * Progress Tracker Component
- * 
- * This component displays the real-time progress of the analysis workflow,
- * showing current status, progress percentage, and step information.
+ * 진행 상황 표시 컴포넌트 (비개발자용 안내)
+ *
+ * 분석 워크플로의 실시간 진행률과 현재 단계(1~5)를 보여줍니다.
+ * - 상태 아이콘, 퍼센트 진행률, 단계별 활성/완료/대기 표시를 담당합니다.
+ * - "결과 미리보기" 버튼을 통해 중간 문서를 열 수 있습니다.
  */
 
 class ProgressTrackerComponent {

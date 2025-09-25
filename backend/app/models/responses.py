@@ -1,8 +1,9 @@
 """
-Pydantic models for API response data structures
+API 응답 모델(Pydantic)
 
-This module defines the response models used by the FastAPI endpoints
-for the problem-solving workflow.
+비개발자 요약:
+- 서버가 프런트엔드로 보낼 때의 데이터 모양을 정의합니다.
+- 진행률(%)·현재 단계·메시지·대기 질문·부분 결과 등이 포함됩니다.
 """
 
 from pydantic import BaseModel, Field

@@ -1,9 +1,9 @@
 /**
- * API Client for Backend Communication
- * 
- * This module handles all HTTP requests to the FastAPI backend,
- * providing a clean interface for the frontend components according
- * to the Vanilla JavaScript Frontend Agent specifications.
+ * API 클라이언트 (비개발자용 안내)
+ *
+ * 백엔드(FastAPI)와 통신하는 모듈입니다.
+ * - 분석 시작/상태 조회/재개를 위한 HTTP 요청을 보냅니다.
+ * - 오류/타임아웃을 처리하고, JSON 응답을 프런트 컴포넌트에서 쓰기 쉽게 반환합니다.
  */
 
 class APIClient {
@@ -76,8 +76,12 @@ class APIClient {
     }
     
     /**
-     * Start a new problem analysis
-     * POST /api/v1/start
+     * 새 분석 시작 (POST /api/v1/start-analysis)
+     *
+     * 예시 사용:
+     *   api.startAnalysis({ description: '월간 보고서 자동화', experience_level: 'beginner' })
+     * 예시 응답:
+     *   { thread_id: '7c0b...', status: 'started', current_step: 'analyze_problem', ... }
      */
     async startAnalysis(problemData) {
         const payload = {
@@ -99,8 +103,12 @@ class APIClient {
     }
     
     /**
-     * Get the current status of a workflow
-     * GET /api/v1/status/{thread_id}
+     * 상태 조회 (GET /api/v1/status/{thread_id})
+     *
+     * 예시 사용:
+     *   api.getStatus('7c0b...')
+     * 예시 응답:
+     *   { status: 'collecting_context', progress_percentage: 50, questions: [...], results: {...} }
      */
     async getStatus(threadId) {
         if (!threadId) {
@@ -113,8 +121,12 @@ class APIClient {
     }
     
     /**
-     * Resume a paused workflow with user input
-     * POST /api/v1/resume/{thread_id}
+     * 재개(사용자 답변 제출) (POST /api/v1/resume/{thread_id})
+     *
+     * 예시 사용:
+     *   api.resumeWorkflow('7c0b...', { input: 'CSV 10분 간격, 3개월 12만행', context_data: {...} })
+     * 예시 응답:
+     *   { status: 'processing', current_step: 'collecting_context', requires_input: false }
      */
     async resumeWorkflow(threadId, contextData) {
         if (!threadId) {

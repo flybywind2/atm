@@ -1,9 +1,9 @@
 """
-Problem Analysis Agent
+문제 분석 에이전트(Analyzer)
 
-This agent handles the initial analysis and structuring of user problems.
-It breaks down the problem into components and assesses complexity using LLM integration.
-Implements the analyze_problem node for the LangGraph workflow.
+비개발자 요약:
+- 사용자가 입력한 문제를 구조화(제목/도메인/카테고리/복잡도 등)하고,
+  부족한 정보를 식별합니다. LangGraph의 analyze_problem 단계에 해당합니다.
 """
 
 import json
@@ -21,16 +21,25 @@ logger = logging.getLogger(__name__)
 
 async def analyze_problem(state: WorkflowState) -> WorkflowState:
     """
-    Analyze and structure the user's problem description using LLM integration.
-    
-    This function implements the analyze_problem node in the LangGraph workflow,
-    providing structured problem breakdown and categorization.
-    
-    Args:
-        state: Current workflow state containing problem_description
-        
-    Returns:
-        Updated state with structured problem analysis
+    사용자가 입력한 문제를 구조화(제목/도메인/카테고리/복잡도 등)합니다.
+
+    매개변수:
+        state: 현재 워크플로 상태(필수 키: problem_description)
+
+    반환:
+        문제 분석 결과가 포함된 갱신 상태(예: problem_analysis, missing_information 등)
+
+    예시(입력 state 핵심):
+        {"problem_description": "월간 보고서 자동화", "conversation_history": []}
+
+    예시(반환 state 차이점):
+        {
+          "current_step": "problem_analyzed",
+          "problem_analysis": {"title": "...", "category": "AUTOMATION", ...},
+          "missing_information": ["data_sources", "frequency"],
+          "context_complete": false,
+          "requires_user_input": true
+        }
     """
     try:
         # Force debug output to file

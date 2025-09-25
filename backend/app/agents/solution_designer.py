@@ -1,9 +1,10 @@
 """
-Solution Design Agent
+솔루션 설계 에이전트(Solution Designer)
 
-This agent analyzes requirements and designs appropriate solution architecture,
-selecting suitable solution types and technology stacks using LLM integration.
-Implements the design_solution node for the LangGraph workflow with routing capabilities.
+비개발자 요약:
+- 이 파일은 요구사항을 바탕으로 솔루션 유형을 정하고(예: 자동화, RAG, ML 등),
+  적절한 기술 스택과 아키텍처 개요를 제안합니다.
+- LangGraph 워크플로의 design_solution 단계에 해당합니다.
 """
 
 import json
@@ -21,16 +22,21 @@ logger = logging.getLogger(__name__)
 
 async def design_solution(state: WorkflowState) -> WorkflowState:
     """
-    Design solution architecture and select appropriate technology stack using LLM integration.
-    
-    Analyzes requirements and problem characteristics to determine the best
-    solution approach and recommend suitable technologies for routing decisions.
-    
-    Args:
-        state: Current workflow state
-        
-    Returns:
-        Updated state with solution design and routing information
+    요구사항을 바탕으로 솔루션 유형/아키텍처/기술 스택을 설계합니다.
+
+    매개변수:
+        state: 현재 워크플로 상태(필요: problem_analysis, requirements_document 등)
+
+    반환:
+        기술 추천(tech_recommendations), 솔루션 유형(solution_type) 등이 포함된 갱신 상태
+
+    예시(반환 주요 키):
+        {
+          "current_step": "solution_designed",
+          "solution_type": "RAG",
+          "tech_recommendations": {"primary_technologies": [...], "recommended_stack": [...]},
+          "tech_stack": ["LangChain", "ChromaDB", ...]
+        }
     """
     try:
         # Force debug output to file

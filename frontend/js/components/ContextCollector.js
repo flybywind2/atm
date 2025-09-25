@@ -1,9 +1,8 @@
 /**
- * Context Collector Component
- * 
- * This component handles the Human-in-the-Loop context collection phase,
- * displaying agent questions and collecting user responses according to
- * the Vanilla JavaScript Frontend Agent specifications.
+ * 컨텍스트 수집 컴포넌트 (비개발자용 안내)
+ *
+ * AI가 생성한 한국어 질문을 표시하고, 사용자의 답변을 받아 워크플로를 재개합니다.
+ * - 질문/진행 표시, 건너뛰기, 이전 질문 보기 등의 인터랙션을 제공합니다.
  */
 
 class ContextCollector {

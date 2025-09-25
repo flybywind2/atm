@@ -1,9 +1,8 @@
 /**
- * Problem Input Component
- * 
- * This component handles the initial problem description input
- * from users, including validation and submission according to
- * the Vanilla JavaScript Frontend Agent specifications.
+ * 문제 입력 컴포넌트 (비개발자용 안내)
+ *
+ * 사용자의 문제 설명을 입력/검증/제출합니다.
+ * - 글자수 카운트, 예시 불러오기, 폼 초기화 등을 제공합니다.
  */
 
 class ProblemInput {

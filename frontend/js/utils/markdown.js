@@ -1,8 +1,9 @@
 /**
- * Markdown Rendering Utilities
- * 
- * This module provides utilities for rendering markdown content
- * with syntax highlighting support.
+ * 마크다운 렌더링 유틸리티 (비개발자용 안내)
+ *
+ * 마크다운 문서를 보기 좋은 HTML로 바꾸고, 코드 하이라이팅을 적용합니다.
+ * - marked.js + highlight.js 사용
+ * - 실패 시 간단한 폴백 변환을 사용합니다.
  */
 
 class MarkdownRenderer {

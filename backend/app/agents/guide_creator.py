@@ -1,9 +1,10 @@
 """
-Implementation Guide Creator Agent
+구현 가이드 생성 에이전트(Guide Creator)
 
-This agent creates comprehensive implementation guides with step-by-step
-instructions, code examples, and testing strategies using LLM integration.
-Implements the create_guide node for the LangGraph workflow.
+비개발자 요약:
+- 이 파일은 앞서 설계된 솔루션과 요구사항을 바탕으로, 설치부터
+  구현 단계, 테스트, 배포 체크리스트까지 상세한 "구현 가이드" 문서를 생성합니다.
+- LangGraph 워크플로의 create_guide 단계에 해당합니다.
 """
 
 import json
@@ -20,16 +21,21 @@ logger = logging.getLogger(__name__)
 
 async def create_guide(state: WorkflowState) -> WorkflowState:
     """
-    Create comprehensive implementation guide using LLM integration.
+    설계/요구사항을 바탕으로 상세 구현 가이드를 생성합니다.
 
-    Generates detailed build plans with code examples, testing strategies,
-    and deployment instructions based on the designed solution.
+    매개변수:
+        state: 현재 워크플로 상태(필요: solution_design/technology_stack 등)
 
-    Args:
-        state: Current workflow state
+    반환:
+        구현 가이드(implementation_guide)와 기술 문서가 포함된 갱신 상태
 
-    Returns:
-        Updated state with implementation guide
+    예시(반환 주요 키):
+        {
+          "current_step": "guide_created",
+          "implementation_guide": "# 구현 가이드 ...",
+          "technical_specifications": { ... },
+          "deployment_checklist": { "steps": [ ... ] }
+        }
     """
     try:
         # Force debug output to file

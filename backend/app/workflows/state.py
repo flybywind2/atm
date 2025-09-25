@@ -1,8 +1,9 @@
 """
-LangGraph TypedDict state definitions
+LangGraph 상태(TypedDict) 정의
 
-This module defines the state objects used by LangGraph workflows
-for the problem-solving copilot system according to the LangGraph Workflow Agent specifications.
+비개발자 요약:
+- 워크플로 각 단계에서 주고받는 "상태"의 필드를 정의합니다.
+- 예: 현재 단계명, 생성된 문서, 질문/답변, 진행 상태 등
 """
 
 from typing import TypedDict, Dict, List, Any, Optional

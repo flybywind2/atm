@@ -7,6 +7,12 @@ configuration switching, error handling, fallback mechanisms, and agent-specific
 prompt engineering.
 
 Phase 5 implementation as specified in plan.md and LLM Integration Agent requirements.
+
+비개발자 요약:
+- 이 파일은 "AI 연결 모듈"입니다. 클라우드/로컬 등 다양한 LLM과 통신하고,
+  다른 에이전트가 쉽게 사용할 수 있는 기능(질문 생성, 요구사항/가이드 생성 등)을 제공합니다.
+- AI 호출이 실패하면 몇 차례 재시도 후 안전한 기본값(폴백)으로 이어가도록 설계되어
+  전체 흐름이 중단되지 않게 합니다.
 """
 
 import os

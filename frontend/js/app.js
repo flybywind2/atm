@@ -1,9 +1,10 @@
 /**
- * Main Application Logic
- * 
- * This file orchestrates the overall application flow, managing transitions
- * between different phases of the problem-solving workflow according to
- * the Vanilla JavaScript Frontend Agent specifications.
+ * 메인 애플리케이션 로직 (비개발자용 안내)
+ *
+ * 이 파일은 화면 간 전환과 워크플로 진행을 총괄합니다.
+ * - 문제 입력 → 진행 화면(1~5단계) → 컨텍스트 수집(질문/답변) → 결과 보기
+ * - 백엔드 API(/start-analysis, /status, /resume)를 호출하여 상태를 주기적으로 갱신합니다.
+ * - "결과 미리보기"를 통해 진행 중 생성된 문서를 표시합니다.
  */
 
 class ProblemSolvingApp {

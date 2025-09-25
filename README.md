@@ -137,5 +137,20 @@ frontend/
 - 테스트: `pytest -q` (일부 통합 테스트는 LLM/API 의존)
 - 이슈/PR 환영합니다 (재현 절차·로그 포함)
 
+## 운영자가 자주 보는 파일과 역할
+| 경로 | 역할(요약) |
+| --- | --- |
+| `backend/start_server.py` | 서버 실행/포트 충돌 처리/안내 |
+| `backend/app/config/settings.py` | 환경설정 로딩(.env), 포트·LLM·RAG 설정 |
+| `backend/app/api/analysis.py` | 분석 시작/상태/재개 API (프런트와 통신) |
+| `backend/app/database/checkpointer.py` | 진행 상태 저장/복원(SQLite), 세션 관리 |
+| `backend/app/appendix/internal_llm.py` | LLM 연동(클라우드/로컬), 재시도·폴백 |
+| `frontend/index.html` | 프런트 진입점(제목/리소스 포함) |
+| `frontend/js/app.js` | 화면 전환/폴링/미리보기 제어 |
+| `frontend/js/components/ProgressTracker.js` | 진행률/단계 표시, 미리보기 버튼 |
+| `frontend/js/components/ContextCollector.js` | 질문 표시/답변 수집 |
+| `frontend/js/components/DocumentViewer.js` | 문서 탭/복사/인쇄/다운로드 |
+| `backend/debug_workflow.txt` | 워크플로 상세 로그(문제 추적 시 확인) |
+
 ---
 본 프로젝트는 내부/개인 학습 및 프로토타이핑 용도로 설계되었습니다. 민감 데이터는 입력하지 마세요.

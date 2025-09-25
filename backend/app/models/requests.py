@@ -1,8 +1,10 @@
 """
-Pydantic models for API request data structures
+API 요청 모델(Pydantic)
 
-This module defines the request models used by the FastAPI endpoints
-for the problem-solving workflow.
+비개발자 요약:
+- 프런트엔드가 서버로 보낼 때의 데이터 모양(필수/선택 필드와 길이 제한 등)을 정의합니다.
+  - 분석 시작: 문제 설명(problem_description)과 선택 컨텍스트(user_context)
+  - 재개: 사용자 답변(user_input)과 선택 컨텍스트(context_data)
 """
 
 from pydantic import BaseModel, Field

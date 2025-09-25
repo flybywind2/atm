@@ -1,9 +1,11 @@
 """
-Context Collection Agent
+컨텍스트 수집 에이전트(Context Collector)
 
-This agent handles Human-in-the-Loop context collection by asking clarifying
-questions and gathering additional information from users using LangGraph's interrupt() functionality.
-Implements the collect_context node for the LangGraph workflow.
+비개발자 요약:
+- 이 파일은 추가 질문을 통해 필요한 정보를 수집하는 역할을 합니다.
+- 부족한 정보가 있으면 한국어 질문을 만들어 사용자에게 묻고,
+  답변을 바탕으로 다음 질문 또는 다음 단계로 넘어갑니다.
+- LangGraph 워크플로의 collect_context 단계에 해당합니다.
 """
 
 import json
@@ -58,17 +60,21 @@ logger = logging.getLogger(__name__)
 
 async def collect_context(state: WorkflowState) -> WorkflowState:
     """
-    Collect additional context through Human-in-the-Loop interaction using interrupt().
-    
-    This function implements the collect_context node in the LangGraph workflow,
-    managing context collection phase with intelligent question generation and
-    user response processing.
-    
-    Args:
-        state: Current workflow state
-        
-    Returns:
-        Updated state with collected context or interrupt for user input
+    Human-in-the-Loop(사람 개입) 방식으로 추가 컨텍스트를 수집합니다.
+
+    매개변수:
+        state: 현재 워크플로 상태(필요: problem_analysis, conversation_history 등)
+
+    반환:
+        다음 질문이 포함된 상태(입력 대기) 또는 컨텍스트 수집 완료 상태
+
+    예시(입력 대기 상태 반환):
+        {
+          "current_step": "collecting_context",
+          "current_status": "awaiting_input",
+          "pending_questions": ["데이터의 출처/형식/예상 규모는?"],
+          "requires_user_input": true
+        }
     """
     try:
         # Force debug output to file

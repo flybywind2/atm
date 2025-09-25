@@ -1,8 +1,17 @@
 """
-FastAPI endpoints for analysis workflow
+분석 워크플로를 위한 FastAPI 엔드포인트
 
-This module implements the REST API endpoints for the problem-solving workflow,
-including start analysis, status checking, and resume functionality.
+이 모듈은 문제 해결 워크플로(시작/상태 조회/재개)를 위한 REST API를 제공합니다.
+
+비개발자 요약:
+- 이 파일은 앱의 "리모컨"입니다. 프런트엔드가 아래 URL을 호출하여
+  분석을 시작하고, 진행률을 확인하고, 사용자의 답변을 전달합니다.
+- 주요 엔드포인트
+  - POST /start-analysis: 새 분석 시작 → thread_id 반환
+  - GET  /status/{thread_id}: 현재 진행률, 메시지, 부분 결과 조회
+  - POST /resume/{thread_id}: 질문에 대한 사용자 답변을 전달하여 재개
+- 내부적으로는 메모리(active_workflows)와 체크포인터 DB를 함께 사용하여
+  장시간 작업도 중단/재개할 수 있도록 설계되어 있습니다.
 """
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Path, status, FastAPI
@@ -39,6 +48,30 @@ async def start_analysis(
     request: AnalysisRequest,
     background_tasks: BackgroundTasks
 ):
+    """새 분석 스레드를 시작합니다.
+
+    비개발자 안내: UI에서 "시작"을 눌렀을 때 호출됩니다. 새로운 상태를 만들고
+    백그라운드에서 워크플로를 실행하여, UI가 주기적으로 상태를 조회할 수 있게 합니다.
+
+    예시(요청 본문):
+        {
+          "problem_description": "수조 pH 이상치를 조기에 탐지하고 원인 분석을 자동화하고 싶습니다.",
+          "user_context": {
+            "experience_level": "beginner",
+            "constraints": "사내망만 사용 가능"
+          }
+        }
+
+    예시(응답):
+        {
+          "thread_id": "7c0b...",
+          "status": "started",
+          "current_step": "analyze_problem",
+          "progress_percentage": 0,
+          "message": "Analysis workflow started successfully",
+          "requires_input": false
+        }
+    """
     """
     Start a new problem analysis workflow
     
@@ -110,6 +143,25 @@ async def start_analysis(
 async def get_status(
     thread_id: str = Path(..., description="Workflow thread identifier")
 ):
+    """현재 진행률과(있다면) 부분 결과를 반환합니다.
+
+    비개발자 안내: 진행 막대와 단계 표시는 이 응답으로 갱신되며, 부분 결과가
+    존재하면 "결과 미리보기" 버튼이 활성화됩니다.
+    예시(응답 일부):
+        {
+          "thread_id": "7c0b...",
+          "status": "collecting_context",
+          "current_step": "collecting_context",
+          "progress_percentage": 50,
+          "message": "추가 컨텍스트 수집 중...",
+          "requires_input": true,
+          "questions": ["데이터의 출처와 형식, 예상량은?"],
+          "results": {
+            "requirements_document": "# 소프트웨어 요구사항 명세서...",
+            "tech_recommendations": {"primary_technologies": [...]}
+          }
+        }
+    """
     """
     Get current status of a workflow thread
     
@@ -223,6 +275,26 @@ async def resume_workflow(
     background_tasks: BackgroundTasks,
     thread_id: str = Path(..., description="Workflow thread identifier")
 ):
+    """사용자 답변으로 일시중지된 워크플로를 재개합니다.
+
+    비개발자 안내: 질문에 대한 답변이 이 엔드포인트로 전달되어
+    워크플로가 다음 단계로 진행됩니다.
+    예시(요청 본문):
+        {
+          "user_input": "CSV 파일(10분 간격 측정, 3개월 12만 행), 센서오염 이슈 잦음",
+          "context_data": {"data_sources": ["CSV"], "frequency": "10분"}
+        }
+
+    예시(응답):
+        {
+          "thread_id": "7c0b...",
+          "status": "processing",
+          "current_step": "collecting_context",
+          "progress_percentage": 50,
+          "message": "Workflow resumed, processing user input...",
+          "requires_input": false
+        }
+    """
     """
     Resume a paused workflow with user input
     
@@ -306,6 +378,10 @@ async def run_langgraph_workflow(thread_id: str, initial_state: ProblemSolvingSt
         thread_id: Unique workflow thread identifier
         initial_state: Initial state for the workflow
     """
+    # 비개발자 안내:
+    # 여러 단계를 순서대로 수행합니다.
+    #   분석 → 컨텍스트 수집(HITL) → 요구사항 → 솔루션 설계 → 구현 가이드
+    # 각 단계가 끝날 때마다 진행률과 중간 결과를 저장하여 UI가 실시간으로 표시합니다.
     # CRITICAL DEBUG: Force file logging at the very start
     with open("debug_workflow.txt", "a", encoding="utf-8") as f:
         f.write(f"\n=== RUN_LANGGRAPH_WORKFLOW CALLED at {datetime.utcnow()} ===\n")
@@ -816,6 +892,14 @@ async def update_workflow_progress(thread_id: str, state_output: Dict[str, Any])
         thread_id: Workflow thread identifier
         state_output: Current state output from LangGraph
     """
+    # 비개발자 안내:
+    # 내부 단계명을 UI용 진행률(%)과 설명 문구로 변환하여 저장합니다.
+    # 예시(state_output 일부):
+    #   {
+    #     "current_step": "design_solution",
+    #     "technology_stack": {"primary_technologies": [...]},
+    #     "implementation_guide": null
+    #   }
     workflow_data = active_workflows.get(thread_id)
     if not workflow_data:
         return
@@ -908,13 +992,15 @@ async def update_workflow_progress(thread_id: str, state_output: Dict[str, Any])
         workflow_data["status"] = WorkflowStatus.GENERATING_REQUIREMENTS
         workflow_data["message"] = "요구사항 문서 생성 중..."
     elif current_step in ["requirements_generated"]:
-        workflow_data["status"] = WorkflowStatus.GENERATING_REQUIREMENTS
+        # 다음 단계(솔루션 설계)로 넘어감을 상태에 반영
+        workflow_data["status"] = WorkflowStatus.DESIGNING_SOLUTION
         workflow_data["message"] = "요구사항 생성 완료, 솔루션 설계 중..."
     elif current_step in ["design_solution"]:
         workflow_data["status"] = WorkflowStatus.DESIGNING_SOLUTION
         workflow_data["message"] = "솔루션 아키텍처 설계 중..."
     elif current_step in ["solution_designed"]:
-        workflow_data["status"] = WorkflowStatus.DESIGNING_SOLUTION
+        # 다음 단계(가이드 생성)로 넘어감을 상태에 반영
+        workflow_data["status"] = WorkflowStatus.CREATING_GUIDE
         workflow_data["message"] = "솔루션 설계 완료, 구현 가이드 생성 중..."
     elif current_step in ["create_guide"]:
         workflow_data["status"] = WorkflowStatus.CREATING_GUIDE
@@ -928,10 +1014,15 @@ async def update_workflow_progress(thread_id: str, state_output: Dict[str, Any])
 
     # Align status with next phase when a step has just completed
     try:
+        # 완료된 단계의 다음 단계 상태로 정렬(일관성 유지)
         if current_step == "context_collected":
             workflow_data["status"] = WorkflowStatus.GENERATING_REQUIREMENTS
         if current_step == "problem_analyzed":
             workflow_data["status"] = WorkflowStatus.COLLECTING_CONTEXT
+        if current_step == "requirements_generated":
+            workflow_data["status"] = WorkflowStatus.DESIGNING_SOLUTION
+        if current_step == "solution_designed":
+            workflow_data["status"] = WorkflowStatus.CREATING_GUIDE
     except Exception:
         pass
 

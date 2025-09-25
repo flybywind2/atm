@@ -1,8 +1,9 @@
 """
-Application Configuration Settings
+애플리케이션 설정
 
-This module handles all environment variable loading and configuration management
-using python-dotenv for the AI Problem Solving Copilot system.
+비개발자 요약:
+- `.env` 파일의 값을 읽어 서버 포트, LLM 종류(외부/로컬), RAG 사용 여부 등을 결정합니다.
+- 여기서 바꾼 설정은 서버 재시작 후 적용됩니다.
 """
 
 import os

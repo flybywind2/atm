@@ -1,14 +1,15 @@
-"""LangGraph main workflow graph definition
+"""
+LangGraph 메인 워크플로 그래프 정의
 
-This module defines the main workflow graph for the problem-solving copilot system
-using LangGraph's StateGraph with full checkpointer integration for state persistence.
+비개발자 요약:
+- 이 파일은 전체 흐름도를 정의합니다. 각 단계(노드)와 다음 단계로 넘어가는
+  조건(간선)을 설정합니다. 체크포인터(SQLite)를 통해 상태를 저장/복원합니다.
 
-Features:
-- Complete SQLite-based state persistence
-- Interruption and resumption capabilities
-- Conditional workflow routing
-- Human-in-the-loop support
-- Session management integration
+특징:
+- SQLite 기반 상태 영속화(중단 후 재개 가능)
+- 조건부 라우팅(분석 → 수집/요구사항/설계/가이드)
+- Human-in-the-Loop(질문/답변) 지원
+- 세션/스레드 단위 실행 관리
 """
 
 import logging

@@ -1,14 +1,9 @@
-"""SQLite Checkpointer Configuration
+"""
+SQLite 체크포인터 설정
 
-This module configures the SQLite checkpointer for LangGraph workflow persistence,
-allowing workflows to be interrupted and resumed with full state management.
-
-Follows Database & Checkpointer Agent specifications for:
-- SQLite database management with proper schema
-- Async/sync checkpoint operations
-- Concurrent user session handling
-- Data integrity and recovery mechanisms
-- LangGraph integration patterns
+비개발자 요약:
+- 워크플로 진행 상태를 SQLite DB에 저장/복원하여, 중단되더라도 이어서 진행할 수 있게 합니다.
+- 세션(사용자 작업) 관리, 무결성 점검, 청소(오래된 데이터 정리) 기능이 포함됩니다.
 """
 
 import asyncio
